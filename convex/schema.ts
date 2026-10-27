@@ -64,8 +64,12 @@ export default defineSchema({
     costWei: v.string(),
     closedAt: v.optional(v.number()),
     proceedsWei: v.optional(v.string()),
+    /** Exits the owner set on a hand-bought position; the tick sells it when one is hit. */
+    takeProfitPct: v.optional(v.number()),
+    stopLossPct: v.optional(v.number()),
   })
     .index("by_owner_open", ["owner", "closedAt"])
+    .index("by_open", ["closedAt"])
     .index("by_strategy_open", ["strategyId", "closedAt"]),
 
   /** What the team decided and did, newest first in the app: matches, research, asks, fills, exits, skips. */

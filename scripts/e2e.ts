@@ -51,9 +51,14 @@ if (!reopened.lines.length) throw new Error("reopened chat is empty");
 // trade screen: token list, candles for the busiest one, and a hand buy refused for lack of ETH (nothing is sent)
 const market = (await step("market list", () => call("/api/market"))) as { tokens: Array<{ token: string; symbol: string }> };
 const pick = market.tokens[0]!;
-const view = (await step(`chart ${pick.symbol}`, () => call(`/api/market/${pick.token}?tf=5m`))) as { candles: unknown[]; market: { pool: string } | null };
-console.log("    candles", view.candles.length, "pool", view.market?.pool);
-const refused = await call("/api/trade", { method: "POST", json: { side: "buy", token: pick.token, symbol: pick.symbol, eth: "0.001" } }).catch((e: Error) => e.message);
+const view = (await step(`token ${pick.symbol}`, () => call(`/api/market/${pick.token}`))) as { market: { pool: string } | null; held: number | null };
+console.log("    pool", view.market?.pool, "held", view.held);
+const q = (await step("quote 0.001 ETH", () => call(`/api/quote?token=${pick.token}&side=buy&eth=0.001`))) as { in: number; out: number; spot: number | null };
+console.log("    quote", q);
+if (!(q.out > 0)) throw new Error("quote returned nothing");
+const noPos = await call("/api/exits", { method: "POST", json: { token: pick.token, takeProfitPct: 80 } }).catch((e: Error) => e.message);
+if (typeof noPos !== "string" || !/No position/.test(noPos)) throw new Error(`exits without a position: ${JSON.stringify(noPos)}`);
+const refused = await call("/api/trade", { method: "POST", json: { side: "buy", token: pick.token, symbol: pick.symbol, eth: "0.001", slippageBps: 500, takeProfitPct: 80, stopLossPct: 35 } }).catch((e: Error) => e.message);
 if (typeof refused !== "string" || !/ETH to trade/.test(refused)) throw new Error(`hand buy was not refused: ${JSON.stringify(refused)}`);
 console.log("ok  hand buy refused:", refused.slice(0, 90));
 

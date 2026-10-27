@@ -5,7 +5,7 @@ import { mutation, query } from "./_generated/server";
 import { guard, secret } from "./guard";
 
 /** Positions and fills, booked from transaction receipts by the Next server. */
-const position = (p: Doc<"positions">) => ({ id: p._id as string, strategyId: (p.strategyId as string | undefined) ?? null, token: p.token, symbol: p.symbol, tokens: p.tokens, costWei: p.costWei, openedAt: p._creationTime });
+const position = (p: Doc<"positions">) => ({ id: p._id as string, owner: p.owner, strategyId: (p.strategyId as string | undefined) ?? null, token: p.token, symbol: p.symbol, tokens: p.tokens, costWei: p.costWei, openedAt: p._creationTime, takeProfitPct: p.takeProfitPct ?? null, stopLossPct: p.stopLossPct ?? null });
 
 export const open = query({
   args: { secret, owner: v.string() },
@@ -24,7 +24,7 @@ export const openForStrategy = query({
 });
 
 export const bought = mutation({
-  args: { secret, owner: v.string(), strategyId: v.optional(v.id("strategies")), token: v.string(), symbol: v.string(), tokens: v.string(), wei: v.string(), hash: v.string() },
+  args: { secret, owner: v.string(), strategyId: v.optional(v.id("strategies")), token: v.string(), symbol: v.string(), tokens: v.string(), wei: v.string(), hash: v.string(), takeProfitPct: v.optional(v.number()), stopLossPct: v.optional(v.number()) },
   handler: async (ctx, { secret: s, wei, hash, ...p }) => {
     guard(s);
     await ctx.db.insert("positions", { ...p, costWei: wei });
@@ -84,5 +84,26 @@ export const tradedTokens = query({
     const rows = await ctx.db.query("trades").withIndex("by_owner", (q) => q.eq("owner", a.owner)).order("desc").take(200);
     const seen = new Set<string>();
     return rows.filter((t) => !seen.has(t.token) && seen.add(t.token)).map((t) => ({ token: t.token, symbol: t.symbol, at: t._creationTime }));
+  },
+});
+
+/** Sets (or clears, with undefined) the exits on the owner's open hand-bought positions in a token. */
+export const setExits = mutation({
+  args: { secret, owner: v.string(), token: v.string(), takeProfitPct: v.optional(v.number()), stopLossPct: v.optional(v.number()) },
+  handler: async (ctx, a) => {
+    guard(a.secret);
+    const open = (await ctx.db.query("positions").withIndex("by_owner_open", (q) => q.eq("owner", a.owner).eq("closedAt", undefined)).collect()).filter((p) => p.token === a.token && !p.strategyId);
+    for (const p of open) await ctx.db.patch(p._id, { takeProfitPct: a.takeProfitPct, stopLossPct: a.stopLossPct });
+    return open.length;
+  },
+});
+
+/** Every open position with an exit the owner set, across owners: the tick watches these. */
+export const withExits = query({
+  args: { secret },
+  handler: async (ctx, a) => {
+    guard(a.secret);
+    const open = await ctx.db.query("positions").withIndex("by_open", (q) => q.eq("closedAt", undefined)).take(500);
+    return open.filter((p) => p.takeProfitPct !== undefined || p.stopLossPct !== undefined).map(position);
   },
 });

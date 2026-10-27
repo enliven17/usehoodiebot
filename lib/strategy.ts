@@ -104,3 +104,13 @@ export function ruleRows(s: Spec): RuleRow[] {
 export const describe = (s: Spec): string[] => ruleRows(s).map(([k, v]) => `${k}: ${v}`);
 
 export const WATCH_LABEL: Record<Spec["watch"], string> = { new: "New Pons launches", curve: "Tokens on the Pons curve", graduated: "Graduated Uniswap v4 pools", all: "All Pons tokens" };
+
+/** Take profit and stop loss in percent, both optional; a message when one is out of range. */
+export function exitsOf(b: { takeProfitPct?: unknown; stopLossPct?: unknown }): { takeProfitPct?: number; stopLossPct?: number } | string {
+  const pct = (v: unknown, max: number) => (v === undefined || v === null || v === "" ? undefined : Number(v) >= SPEC_LIMITS.exitPct[0] && Number(v) <= max ? Number(v) : NaN);
+  const takeProfitPct = pct(b.takeProfitPct, SPEC_LIMITS.exitPct[1]);
+  const stopLossPct = pct(b.stopLossPct, 99);
+  if (Number.isNaN(takeProfitPct)) return "Take profit goes from +5% to +1000%.";
+  if (Number.isNaN(stopLossPct)) return "Stop loss goes from -5% to -99%.";
+  return { takeProfitPct, stopLossPct };
+}

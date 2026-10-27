@@ -105,7 +105,12 @@
 .chatTitle { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 14.5px }
 
 /* trade */
-.trade { flex: 1; display: grid; grid-template-columns: 220px minmax(0, 1fr); min-height: 0 }
+.trade { flex: 1; display: grid; grid-template-columns: 220px minmax(0, 1fr) 320px; min-height: 0 }
+/* the trade view is a full terminal: the order ticket takes the side column's place */
+.shell[data-panel="trade"] { grid-template-columns: var(--rail-w) minmax(0, 1fr) }
+.shell[data-panel="trade"] .side { display: none }
+.ticketCol { min-height: 0; overflow-y: auto; padding: 16px 18px; border-left: 1px solid var(--border); scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, .14) transparent }
+.ticketCol > .block { padding: 0; border: 0 }
 .tokens { display: flex; flex-direction: column; min-height: 0; padding: 14px 10px 0 14px; border-right: 1px solid var(--border) }
 .tokens :global(.field) { width: 100%; margin-bottom: 8px }
 .tokenList { flex: 1; overflow-y: auto; margin: 0 -6px 0 0; padding: 0 6px 12px 0; list-style: none; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, .14) transparent }
@@ -130,7 +135,7 @@
 .chartWrap { position: relative; padding: 12px 0 0 }
 .chartWrap > .seg { display: inline-flex; margin-bottom: 8px }
 .chartWrap > .seg button { flex: none; padding: 5px 10px; font-family: var(--font-mono) }
-.chart { height: min(52vh, 460px); min-height: 280px }
+.chart { height: min(58vh, 560px); min-height: 300px }
 .chartState { position: absolute; inset: 50px 0 0; display: grid; place-items: center; margin: 0; font-size: 13px; color: var(--text-muted); pointer-events: none }
 .deskGrid { display: grid; grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); gap: 0 28px; border-top: 1px solid var(--border) }
 .deskGrid > .block { border-bottom: 0 }
@@ -149,25 +154,14 @@
 .why strong { font-weight: 500; color: var(--text) }
 .why time { flex: none; font-size: 11.5px }
 
+.deskGrid { grid-template-columns: minmax(0, 1fr) }
 @media (max-width: 80rem) {
-  .deskGrid { grid-template-columns: minmax(0, 1fr) }
+  .trade { grid-template-columns: 200px minmax(0, 1fr) 300px }
 }
 @media (max-width: 65rem) {
-  .shell { grid-template-columns: var(--rail-w) minmax(0, 1fr) }
-  .side { display: none }
-  .shell[data-panel="team"] .main { display: none }
-  .shell[data-panel="team"] .side { display: block; border-left: 0 }
-}
-@media (max-width: 48rem) {
-  .shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto }
-  .rail { grid-row: 2; flex-direction: row; justify-content: space-around; padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); border-right: 0; border-top: 1px solid var(--border) }
-  .railBrand { display: none }
-  .railEnd { margin-top: 0 }
-  .railBtn[aria-current="page"]::before { left: 12px; right: 12px; top: -6px; bottom: auto; width: auto; height: 2px }
-  .main, .side { grid-row: 1 }
-  .thread { padding: 20px 16px 12px }
-  .composer { margin: 0 12px 12px }
-  .trade { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) }
+  .trade { display: flex; flex-direction: column; overflow-y: auto }
+  .tokens, .desk, .ticketCol { flex: none; overflow: visible }
+  .ticketCol { border-left: 0; border-top: 1px solid var(--border); padding: 16px }
   .tokens { padding: 12px 12px 0; border-right: 0; border-bottom: 1px solid var(--border) }
   .tokenList { display: flex; gap: 6px; overflow-x: auto; margin: 0; padding: 0 0 10px }
   .tokenList li { flex: none; width: 150px }
@@ -175,6 +169,20 @@
   .desk { padding: 14px 16px 20px }
   .stats { margin: 0 }
   .chart { height: 300px }
+  .shell { grid-template-columns: var(--rail-w) minmax(0, 1fr) }
+  .side { display: none }
+  .shell[data-panel="team"] .main { display: none }
+  .shell[data-panel="team"] .side { display: block; border-left: 0 }
+}
+@media (max-width: 48rem) {
+  .shell, .shell[data-panel="trade"] { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto }
+  .rail { grid-row: 2; flex-direction: row; justify-content: space-around; padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); border-right: 0; border-top: 1px solid var(--border) }
+  .railBrand { display: none }
+  .railEnd { margin-top: 0 }
+  .railBtn[aria-current="page"]::before { left: 12px; right: 12px; top: -6px; bottom: auto; width: auto; height: 2px }
+  .main, .side { grid-row: 1 }
+  .thread { padding: 20px 16px 12px }
+  .composer { margin: 0 12px 12px }
   .history { padding: 20px 16px }
 }
 @media (prefers-reduced-transparency: reduce) {
@@ -229,3 +237,46 @@
 .skeleton::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, .04) 50%, transparent 80%); animation: shimmer 1.4s var(--ease) infinite; animation-delay: inherit }
 @keyframes shimmer { to { transform: translateX(100%) } }
 @media (prefers-reduced-motion: reduce) { .skeleton::after { animation: none } }
+
+/* order ticket */
+.ticket { display: flex; flex-direction: column; gap: 12px }
+.sides { display: grid; grid-template-columns: 1fr 1fr; padding: 3px; border-radius: 12px; background: rgba(255, 255, 255, .03); border: 1px solid var(--border) }
+.sides button { height: 34px; border-radius: 9px; font-size: 13.5px; color: var(--text-muted); transition: background-color .2s var(--ease), color .2s var(--ease) }
+.sides[data-side="buy"] button[aria-pressed="true"] { background: rgba(159, 232, 181, .14); color: var(--green-300) }
+.sides[data-side="sell"] button[aria-pressed="true"] { background: rgba(252, 165, 165, .14); color: var(--red-300) }
+.ticketRow { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12.5px; color: var(--text-muted) }
+.balanceBtn { font-size: 12.5px; color: var(--text-muted) }
+.balanceBtn:not(:disabled):hover { color: var(--text) }
+.amountBox { display: flex; align-items: center; gap: 10px; height: 52px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--border); background: rgba(255, 255, 255, .025); transition: border-color .2s }
+.amountBox:focus-within { border-color: var(--border-strong) }
+.amountBox input, .amountBox output { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text); font-size: 20px }
+.amountBox > span { font-family: var(--font-mono); font-size: 13px; color: var(--text-muted) }
+.ticket .presets { margin: -4px 0 0 }
+.ticket .presets :global(.chip) { height: 28px; padding: 0 10px; font-size: 12px }
+.ticket .presets :global(.chip):disabled { opacity: .4 }
+.range { width: 100%; height: 4px; margin: 2px 0; appearance: none; border-radius: 2px; background: linear-gradient(90deg, var(--red-300) var(--fill), rgba(255, 255, 255, .1) var(--fill)); accent-color: var(--red-300) }
+.range::-webkit-slider-thumb { appearance: none; width: 16px; height: 16px; border-radius: 50%; background: var(--text); border: 0 }
+.range::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: var(--text); border: 0 }
+.quote { display: grid; gap: 6px; margin: 0; padding: 10px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); transition: opacity .2s }
+.quote[data-loading] { opacity: .55 }
+.quote div { display: flex; justify-content: space-between; gap: 10px; font-size: 12.5px }
+.quote dt { color: var(--text-faint) }
+.quote dd { margin: 0; color: var(--text-2) }
+.slip { display: flex; align-items: center; gap: 2px }
+.slip button { padding: 4px 7px; border-radius: 7px; font-family: var(--font-mono); font-size: 12px; color: var(--text-muted) }
+.slip button[aria-pressed="true"] { background: var(--surface-active); color: var(--text) }
+.slip input { width: 58px; height: 26px; padding: 0 6px; border-radius: 7px; border: 1px solid var(--border); background: transparent; color: var(--text); font-size: 12px; outline: 0 }
+.exits { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0; padding: 0; border: 0 }
+.exits legend { margin-bottom: 8px; padding: 0; font-size: 12.5px; color: var(--text-muted) }
+.exits label { min-width: 0; display: flex; flex-direction: column; gap: 4px; font-size: 11.5px; color: var(--text-faint) }
+.exitField { display: flex; align-items: center; gap: 4px; height: 36px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--border); background: rgba(255, 255, 255, .025); font-family: var(--font-mono); font-size: 13px; color: var(--text-muted) }
+.exitField:focus-within { border-color: var(--border-strong) }
+.exitField input { flex: 1; width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text); font-size: 13px }
+.saveExits { grid-column: 1 / -1; height: 32px; font-size: 12.5px }
+.go { height: 46px; border: 0; font-weight: 500; color: var(--ink-950) }
+.go[data-side="buy"] { background: var(--green-300) }
+.go[data-side="sell"] { background: var(--red-300) }
+.go:hover { filter: brightness(1.06) }
+.posLine { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 12.5px }
+.chartLoading { display: block; width: 120px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .5), transparent) 0 0 / 50% 100% no-repeat, rgba(255, 255, 255, .08); animation: sweep 1s var(--ease) infinite }
+@keyframes sweep { from { background-position: -60px 0 } to { background-position: 180px 0 } }

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import type { Candidate } from "./chain/market";
-import { exitReason, parseSpec, rejects, ruleRows } from "./strategy";
+import { exitReason, exitsOf, parseSpec, rejects, ruleRows } from "./strategy";
 
 const c = (o: Partial<Candidate>): Candidate => ({ token: "0x0000000000000000000000000000000000000001", symbol: "X", venue: "curve", priceEth: 1e-9, ageMinutes: 30, mcapUsd: 20_000, liquidityUsd: 8_000, curvePct: 10, buys1h: 30, sells1h: 10, ...o });
 
@@ -45,4 +45,11 @@ test("ruleRows reads back in words, ASCII values only", () => {
   assert.equal(get("Age"), "under 2h");
   assert.equal(get("Stop loss"), "-35%");
   assert.ok(rows.every(([, v]) => /^[ -~]+$/.test(v)));
+});
+
+test("exitsOf keeps exits in range and names the bad one", () => {
+  assert.deepEqual(exitsOf({ takeProfitPct: 80, stopLossPct: "35" }), { takeProfitPct: 80, stopLossPct: 35 });
+  assert.deepEqual(exitsOf({}), { takeProfitPct: undefined, stopLossPct: undefined });
+  assert.match(exitsOf({ stopLossPct: 100 }) as string, /Stop loss/);
+  assert.match(exitsOf({ takeProfitPct: 2 }) as string, /Take profit/);
 });

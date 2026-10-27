@@ -3,6 +3,8 @@ import { parseEther } from "viem";
 import { errorText, fail, requireTeam } from "@/lib/server/http";
 import { getExecutor, normalizeToken } from "@/lib/server/team";
 import { auto } from "@/lib/server/tick";
+import { exitsOf, SPEC_LIMITS } from "@/lib/strategy";
+
 
 export const maxDuration = 120;
 
@@ -10,10 +12,14 @@ export const maxDuration = 120;
 export async function POST(req: Request) {
   const team = await requireTeam();
   if (team instanceof Response) return team;
-  const b = (await req.json().catch(() => null)) as { side?: unknown; token?: unknown; symbol?: unknown; eth?: unknown; pct?: unknown } | null;
+  const b = (await req.json().catch(() => null)) as { side?: unknown; token?: unknown; symbol?: unknown; eth?: unknown; pct?: unknown; slippageBps?: unknown; takeProfitPct?: unknown; stopLossPct?: unknown } | null;
   const token = normalizeToken(b?.token);
   const symbol = typeof b?.symbol === "string" ? b.symbol.replace(/[^\w$.\- ]/g, "").slice(0, 24) || "token" : "token";
   if (!token || (b?.side !== "buy" && b?.side !== "sell")) return fail(400, "Bad request.");
+  const slippageBps = Math.round(Number(b.slippageBps ?? 300));
+  if (!(slippageBps >= SPEC_LIMITS.slippageBps[0] && slippageBps <= SPEC_LIMITS.slippageBps[1])) return fail(400, "Slippage goes from 0.5% to 15%.");
+  const exits = exitsOf(b);
+  if (typeof exits === "string") return fail(400, exits);
   let amount: bigint;
   try {
     if (b.side === "buy") {
@@ -31,7 +37,8 @@ export async function POST(req: Request) {
   }
   try {
     // auto() books the fill, logs it, and tracks a send that is not confirmed in time until the tick settles it
-    const hash = await auto(team, { kind: b.side, token, symbol, amount, slippageBps: 300, strategyId: null }, "Traded by hand", "by your hand");
+    // ponytail: a buy that is sent but not confirmed in time is settled later without its exits; set them again on the position.
+    const hash = await auto(team, { kind: b.side, token, symbol, amount, slippageBps, strategyId: null, ...(b.side === "buy" ? exits : {}) }, "Traded by hand", "by your hand");
     return hash ? Response.json({ hash: hash.split(" ")[0], pending: hash.includes("sent") }) : fail(409, "Another trade is in flight. Try again in a minute.");
   } catch (err) {
     return fail(409, errorText(err));

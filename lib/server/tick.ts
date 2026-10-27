@@ -20,6 +20,7 @@ export async function tick() {
   const log: string[] = [];
   await mutate(api.approvals.expire, { ttlMs: APPROVAL_TTL_MS });
   log.push(...(await settle()));
+  log.push(...(await handExits().catch((err) => [`hand exits: ${safeMessage(err)}`])));
   const strategies = await query(api.strategies.active, {});
   if (!strategies.length) return log;
   const market = await candidates();
@@ -95,6 +96,25 @@ export async function auto(team: Team, a: Parameters<typeof trade>[1], reason: s
     await mutate(api.approvals.recordSent, { owner: team.owner, strategyId: (a.strategyId ?? undefined) as Id<"strategies"> | undefined, kind: a.kind, token: a.token, symbol: a.symbol, amount: a.amount.toString(), reason, hash: err.hash });
     return `${err.hash} (sent, settling)`;
   }
+}
+
+/** Take profit and stop loss the owner set on a hand-bought position: sold automatically, as they asked. */
+async function handExits() {
+  const open = await query(api.book.withExits, {});
+  if (!open.length) return [];
+  const prices = await getExecutor().prices([...new Set(open.map((p) => p.token))]);
+  const out: string[] = [];
+  for (const p of open) {
+    const price = prices.get(p.token);
+    const entry = Number(p.costWei) / Number(p.tokens);
+    const why = price === undefined ? null : exitReason({ takeProfitPct: p.takeProfitPct ?? undefined, stopLossPct: p.stopLossPct ?? undefined } as Spec, entry, price);
+    if (!why) continue;
+    const reason = `${p.symbol} hit your ${why} (${((price! / entry - 1) * 100).toFixed(0)}%).`;
+    await logEvent(p.owner, { member: "trader", kind: "exit", text: reason, token: p.token, symbol: p.symbol });
+    const f = await auto((await getTeam(p.owner))!, { kind: "sell", token: p.token, symbol: p.symbol, amount: BigInt(p.tokens), slippageBps: 500, strategyId: null, positionId: p.id }, reason, `on your ${why}`);
+    out.push(`${p.id}: ${f ? `sold ${p.symbol} (${why})` : "wallet busy"}`);
+  }
+  return out;
 }
 
 /** Trades that were broadcast but not confirmed in time: book them from their receipts once they land. */
