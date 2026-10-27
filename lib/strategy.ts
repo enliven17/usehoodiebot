@@ -1,0 +1,95 @@
+/** A Strategy: what to watch, what must pass, how much, and when to get out. Pure: parse, match, exit. */
+import type { Candidate } from "./chain/market";
+
+export type Spec = {
+  watch: "new" | "curve" | "graduated" | "all";
+  sizeEth: number;
+  slippageBps: number;
+  maxOpen: number;
+  minMcapUsd?: number;
+  maxMcapUsd?: number;
+  minLiquidityUsd?: number;
+  minVolume1hUsd?: number;
+  minCurvePct?: number;
+  maxCurvePct?: number;
+  maxAgeMinutes?: number;
+  /** buys / sells over the last hour */
+  minBuySellRatio?: number;
+  takeProfitPct?: number;
+  stopLossPct?: number;
+};
+
+export const SPEC_LIMITS = { sizeEth: [0.0005, 1], slippageBps: [50, 1500], maxOpen: [1, 10] } as const;
+const NEW_MINUTES = 120;
+
+const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
+const pos = (v: unknown) => { const n = num(v); return n !== undefined && n >= 0 ? n : undefined; };
+const clamp = (v: number, [lo, hi]: readonly [number, number]) => Math.min(hi, Math.max(lo, v));
+
+/** Anything the model or a client sends becomes a safe Spec: unknown fields dropped, sizes clamped. */
+export function parseSpec(raw: unknown): Spec {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const watch = ["new", "curve", "graduated", "all"].includes(r.watch as string) ? (r.watch as Spec["watch"]) : "new";
+  return {
+    watch,
+    sizeEth: clamp(num(r.sizeEth) ?? 0.01, SPEC_LIMITS.sizeEth),
+    slippageBps: Math.round(clamp(num(r.slippageBps) ?? 300, SPEC_LIMITS.slippageBps)),
+    maxOpen: Math.round(clamp(num(r.maxOpen) ?? 3, SPEC_LIMITS.maxOpen)),
+    minMcapUsd: pos(r.minMcapUsd),
+    maxMcapUsd: pos(r.maxMcapUsd),
+    minLiquidityUsd: pos(r.minLiquidityUsd),
+    minVolume1hUsd: pos(r.minVolume1hUsd),
+    minCurvePct: pos(r.minCurvePct),
+    maxCurvePct: pos(r.maxCurvePct),
+    maxAgeMinutes: pos(r.maxAgeMinutes),
+    minBuySellRatio: pos(r.minBuySellRatio),
+    takeProfitPct: pos(r.takeProfitPct),
+    stopLossPct: pos(r.stopLossPct) !== undefined ? Math.min(99, pos(r.stopLossPct)!) : undefined,
+  };
+}
+
+/** Null when the candidate passes, else the first rule it fails (shown to the user as the reason). */
+export function rejects(s: Spec, c: Candidate): string | null {
+  if (s.watch === "graduated" && c.venue !== "graduated") return "not graduated";
+  if ((s.watch === "curve" || s.watch === "new") && c.venue !== "curve") return "not on the curve";
+  if (s.watch === "new" && !(c.ageMinutes !== undefined && c.ageMinutes <= NEW_MINUTES)) return "not a new launch";
+  const below = (v: number | undefined, min: number | undefined) => min !== undefined && !(v !== undefined && v >= min);
+  const above = (v: number | undefined, max: number | undefined) => max !== undefined && !(v !== undefined && v <= max);
+  if (below(c.mcapUsd, s.minMcapUsd) || above(c.mcapUsd, s.maxMcapUsd)) return "market cap";
+  if (below(c.liquidityUsd, s.minLiquidityUsd)) return "liquidity";
+  if (below(c.volume1hUsd, s.minVolume1hUsd)) return "volume";
+  if (below(c.curvePct, s.minCurvePct) || above(c.curvePct, s.maxCurvePct)) return "curve progress";
+  if (above(c.ageMinutes, s.maxAgeMinutes)) return "age";
+  if (s.minBuySellRatio !== undefined) {
+    const buys = c.buys1h ?? 0, sells = c.sells1h ?? 0;
+    if (buys / Math.max(1, sells) < s.minBuySellRatio) return "buy pressure";
+  }
+  return null;
+}
+
+/** Whether an open position should be closed at `priceEth` (ETH per token now) against its entry. */
+export function exitReason(s: Spec, entryEth: number, priceEth: number): "take profit" | "stop loss" | null {
+  if (!(entryEth > 0) || !(priceEth > 0)) return null;
+  const change = (priceEth / entryEth - 1) * 100;
+  if (s.takeProfitPct !== undefined && change >= s.takeProfitPct) return "take profit";
+  if (s.stopLossPct !== undefined && change <= -s.stopLossPct) return "stop loss";
+  return null;
+}
+
+/** One line a person can read back, e.g. on the strategy card. */
+export function describe(s: Spec): string[] {
+  const usd = (n: number) => (n >= 1000 ? `$${(n / 1000).toFixed(n % 1000 ? 1 : 0)}k` : `$${n}`);
+  const out = [`size ${s.sizeEth} ETH`, `slippage ${s.slippageBps / 100}%`, `max ${s.maxOpen} open`];
+  if (s.minMcapUsd !== undefined) out.push(`mcap ≥ ${usd(s.minMcapUsd)}`);
+  if (s.maxMcapUsd !== undefined) out.push(`mcap ≤ ${usd(s.maxMcapUsd)}`);
+  if (s.minLiquidityUsd !== undefined) out.push(`liquidity ≥ ${usd(s.minLiquidityUsd)}`);
+  if (s.minVolume1hUsd !== undefined) out.push(`1h volume ≥ ${usd(s.minVolume1hUsd)}`);
+  if (s.minCurvePct !== undefined || s.maxCurvePct !== undefined) out.push(`curve ${s.minCurvePct ?? 0}–${s.maxCurvePct ?? 100}%`);
+  if (s.maxAgeMinutes !== undefined) out.push(`age ≤ ${s.maxAgeMinutes}m`);
+  if (s.minBuySellRatio !== undefined) out.push(`buys/sells ≥ ${s.minBuySellRatio}`);
+  if (s.takeProfitPct !== undefined) out.push(`take profit +${s.takeProfitPct}%`);
+  if (s.stopLossPct !== undefined) out.push(`stop −${s.stopLossPct}%`);
+  return out;
+}
+
+export const WATCH_LABEL: Record<Spec["watch"], string> = { new: "New Pons launches", curve: "Tokens on the Pons curve", graduated: "Graduated Uniswap v4 pools", all: "All Pons tokens" };
