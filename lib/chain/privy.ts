@@ -79,6 +79,15 @@ export function createPrivy(o: { appId: string; appSecret: string; authKey?: str
       return signed as Hex;
     },
 
+    /** A new policy attached to an existing wallet in place of its old one. Returns the new policy id. */
+    async replacePolicy(walletId: string, policy: EvmPolicyInput): Promise<string> {
+      checkWalletId(walletId);
+      const p = await call("POST", "/v1/policies", { ...(policy as unknown as Record<string, Json>), ...owner });
+      if (typeof p.id !== "string") throw new Error("privy returned a malformed policy");
+      await call("PATCH", `/v1/wallets/${walletId}`, { policy_ids: [p.id] });
+      return p.id;
+    },
+
     /** Wallet, then its policy (built from the address), then attach. A wallet whose policy failed must never be funded. */
     async createWalletWithPolicy(buildPolicy: (address: Address) => EvmPolicyInput): Promise<{ id: string; address: Address; policyId: string }> {
       const w = await call("POST", "/v1/wallets", { chain_type: "ethereum", ...owner });

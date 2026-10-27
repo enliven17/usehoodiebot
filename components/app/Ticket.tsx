@@ -152,6 +152,7 @@ export function Ticket({ pick, snap, view, last, side: asked, onDone }: { pick: 
         <div><dt>You get</dt><dd className="num">{quote ? (side === "buy" ? `${qty(quote.out)} ${symbol}` : ethText(quote.out)) : "–"}</dd></div>
         <div><dt>Minimum, at {slipPct || 0}% slippage</dt><dd className="num">{min !== null ? (side === "buy" ? `${qty(min)} ${symbol}` : ethText(min)) : "–"}</dd></div>
         <div><dt>Fill price</dt><dd className="num">{fill ? `${price(fill)} ETH` : "–"}</dd></div>
+        <div><dt>Hoodie fee</dt><dd className="num">{quote?.feePct !== undefined ? `${quote.feePct}%` : "–"}</dd></div>
         <div><dt>Price impact, fees in</dt><dd className={`num ${impact !== null && impact > 10 ? "down" : ""}`}>{impact !== null ? `${impact.toFixed(2)}%` : "–"}</dd></div>
       </dl>
 

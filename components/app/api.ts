@@ -5,7 +5,8 @@ import type { Snapshot } from "@/lib/server/snapshot";
 import type { Fill } from "./Chart";
 
 export type { Line, Snapshot };
-export type Access = "approved" | "pending" | "rejected" | "none";
+export type Access = "approved" | "pending" | "rejected" | "none" | "needs_token";
+export type TokenGate = { live: false } | { live: true; address: string; min: number; held: number | null };
 export type Chat = { thread: number; title: string; at: number; open: boolean };
 export type MarketToken = Partial<Candidate> & { token: string; symbol: string; group: "held" | "traded" | "market" };
 export type TokenView = {
@@ -14,7 +15,7 @@ export type TokenView = {
   position: { tokens: number; costEth: number; takeProfitPct: number | null; stopLossPct: number | null; trailingStopPct: number | null; hand: boolean } | null;
   held: number | null;
 };
-export type Quote = { in: number; out: number; spot: number | null };
+export type Quote = { in: number; out: number; spot: number | null; feePct?: number };
 type Exits = { takeProfitPct?: string; stopLossPct?: string; trailingStopPct?: string };
 
 async function call<T>(path: string, init?: RequestInit & { json?: unknown }): Promise<T> {
@@ -45,7 +46,7 @@ export const api = {
   strategy: (id: string, patch: { active?: boolean; mode?: "ask" | "auto" }) => call(`/api/strategies/${id}`, { method: "PATCH", json: patch }),
   deleteStrategy: (id: string) => call(`/api/strategies/${id}`, { method: "DELETE" }),
   withdraw: (eth: string) => call<{ hash: string }>("/api/withdraw", { method: "POST", json: { eth } }),
-  access: () => call<{ status: Access; admin: boolean }>("/api/access"),
+  access: () => call<{ status: Access; admin: boolean; token: TokenGate }>("/api/access"),
   apply: (answers: Record<string, string | string[]>) => call<{ status: Access }>("/api/access", { method: "POST", json: { answers } }),
   nonce: () => call<{ nonce: string }>("/api/auth/nonce"),
   verify: (address: string, signature: string) => call<{ owner: string }>("/api/auth/verify", { method: "POST", json: { address, signature } }),

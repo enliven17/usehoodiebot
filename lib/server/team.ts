@@ -11,6 +11,7 @@ import { getPrivy } from "../chain/privy";
 import { api, mutate, query } from "../db";
 import { safeMessage } from "./errors";
 import { fillEvent, logEvent } from "./events";
+import { afterFee, FEE_WALLET, feeOf } from "./fees";
 
 export type Team = { owner: Address; wallet: Address; walletId: string };
 export type Approval = Awaited<ReturnType<typeof propose>>;
@@ -33,14 +34,14 @@ export async function getTeam(owner: string): Promise<Team | null> {
 export async function ensureTeam(owner: Address): Promise<Team> {
   const existing = await getTeam(owner);
   if (existing) return existing;
-  const w = await getPrivy().createWalletWithPolicy((address) => robinhoodAgentPolicy(address, owner, null));
+  const w = await getPrivy().createWalletWithPolicy((address) => robinhoodAgentPolicy(address, owner, null, FEE_WALLET));
   // ponytail: a lost race leaves one unused, unfunded wallet in Privy; harmless.
   const t = await mutate(api.teams.create, { owner, wallet: w.address, walletId: w.id, policyId: w.policyId });
   return { owner, wallet: t.wallet as Address, walletId: t.walletId };
 }
 
 /** Runs `fn` holding the team's wallet lease, or returns null when another transaction is in flight. */
-async function withLease<T>(owner: string, fn: () => Promise<T>): Promise<T | null> {
+export async function withLease<T>(owner: string, fn: () => Promise<T>): Promise<T | null> {
   const token = randomUUID();
   if (!(await mutate(api.teams.lease, { owner, seconds: LEASE_SECONDS, token }))) return null;
   try {
@@ -69,16 +70,49 @@ export async function trade(team: Team, a: { kind: "buy" | "sell"; token: string
   if (a.kind === "buy") {
     const spendable = await ex.spendable(team.wallet);
     if (spendable < a.amount) throw new Error(`The wallet has ${formatEther(spendable)} ETH to trade; this needs ${formatEther(a.amount)}.`);
-    const f = await ex.buy({ ...base, wei: a.amount }).catch(sent);
-    await mutate(api.book.bought, { owner: team.owner, strategyId: strategyId(a.strategyId), token: a.token, symbol: a.symbol, tokens: f.tokens.toString(), wei: f.wei.toString(), hash: f.hash, takeProfitPct: a.takeProfitPct, stopLossPct: a.stopLossPct, trailingStopPct: a.trailingStopPct });
-    return f;
+    // the commission comes off the top: the swap gets the rest, the position's cost is the whole amount
+    const f = await ex.buy({ ...base, wei: afterFee(a.amount) }).catch(sent);
+    const fee = feeOf(a.amount);
+    await mutate(api.book.bought, { owner: team.owner, strategyId: strategyId(a.strategyId), token: a.token, symbol: a.symbol, tokens: f.tokens.toString(), wei: (f.wei + fee).toString(), hash: f.hash, takeProfitPct: a.takeProfitPct, stopLossPct: a.stopLossPct, trailingStopPct: a.trailingStopPct });
+    await chargeFee(team, { side: "buy", token: a.token, wei: fee, tradeHash: f.hash });
+    return { ...f, wei: f.wei + fee };
   }
   const held = await ex.tokenBalance(team.wallet, a.token);
   const tokens = a.amount === 0n || held < a.amount ? held : a.amount;
   if (tokens === 0n) throw new Error(`The wallet holds no ${a.symbol}.`);
   const f = await ex.sell({ ...base, tokens }).catch(sent);
-  await mutate(api.book.sold, { owner: team.owner, token: a.token, symbol: a.symbol, tokens: f.tokens.toString(), wei: f.wei.toString(), hash: f.hash, closes: tokens === held, positionId: a.positionId });
-  return f;
+  const fee = feeOf(f.wei);
+  await mutate(api.book.sold, { owner: team.owner, token: a.token, symbol: a.symbol, tokens: f.tokens.toString(), wei: (f.wei - fee).toString(), hash: f.hash, closes: tokens === held, positionId: a.positionId });
+  await chargeFee(team, { side: "sell", token: a.token, wei: fee, tradeHash: f.hash });
+  return { ...f, wei: f.wei - fee };
+}
+
+/**
+ * Sends one commission to the fee wallet and books it. Never throws: a fee that does not go through is booked as owed
+ * and collected by the tick, so a filled trade is never reported as failed over its fee. Call it under the lease.
+ */
+export async function chargeFee(team: Team, f: { side: "buy" | "sell"; token: string; wei: bigint; tradeHash: string }) {
+  if (f.wei <= 0n) return;
+  const hash = await getExecutor().transfer({ walletId: team.walletId, wallet: team.wallet, to: FEE_WALLET, wei: f.wei }).catch((err) => {
+    console.error("fee transfer failed, booked as owed", safeMessage(err));
+    return undefined;
+  });
+  await mutate(api.fees.record, { owner: team.owner, side: f.side, token: f.token, wei: f.wei.toString(), tradeHash: f.tradeHash, hash }).catch(() => {});
+}
+
+/** Owed commissions, sent now where the wallet is free and holds the ETH. */
+export async function collectFees(): Promise<string[]> {
+  const out: string[] = [];
+  for (const f of await query(api.fees.owed, {})) {
+    const team = await getTeam(f.owner);
+    if (!team) continue;
+    const hash = await withLease(team.owner, () => getExecutor().transfer({ walletId: team.walletId, wallet: team.wallet, to: FEE_WALLET, wei: BigInt(f.wei) })).catch(() => null);
+    if (hash) {
+      await mutate(api.fees.paid, { id: f.id as Id<"fees">, hash });
+      out.push(`fee ${f.id} paid ${hash}`);
+    }
+  }
+  return out;
 }
 
 export const propose = (owner: string, a: { kind: "buy" | "sell"; token: string; symbol: string; amount: bigint; reason: string; strategyId: string | null }) =>

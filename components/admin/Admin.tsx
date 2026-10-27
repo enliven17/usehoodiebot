@@ -15,7 +15,7 @@ import s from "./admin.module.css";
 type Status = "pending" | "approved" | "rejected";
 type Application = { id: string; owner: string; answers: Record<string, string | string[]>; status: Status; submittedAt: number; decidedAt: number | null };
 type Data = {
-  counts: { teams: number; trades: number; volumeWei: string; activeStrategies: number; autoStrategies: number; openPositions: number; pendingApprovals: number; applications: Record<Status, number> };
+  counts: { teams: number; trades: number; volumeWei: string; activeStrategies: number; autoStrategies: number; openPositions: number; pendingApprovals: number; feesPaidWei: string; feesOwedWei: string; applications: Record<Status, number> };
   teams: Array<{ owner: string; wallet: string; createdAt: number; trades: number; volumeWei: string; strategies: number; open: number }>;
   trades: Array<{ owner: string; side: "buy" | "sell"; symbol: string; token: string; wei: string; hash: string; at: number }>;
   events: Array<{ owner: string; member: string; kind: string; text: string; at: number }>;
@@ -77,6 +77,8 @@ export function Admin() {
           ["Teams", c?.teams],
           ["Trades", c?.trades],
           ["Volume", c ? eth(c.volumeWei) : undefined],
+          ["Fees earned", c ? eth(c.feesPaidWei) : undefined],
+          ["Fees owed", c ? eth(c.feesOwedWei) : undefined],
           ["Strategies on", c ? `${c.activeStrategies} (${c.autoStrategies} auto)` : undefined],
           ["Open positions", c?.openPositions],
           ["Approvals waiting", c?.pendingApprovals],

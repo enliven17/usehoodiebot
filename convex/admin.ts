@@ -12,7 +12,7 @@ export const overview = query({
   args: { secret },
   handler: async (ctx, a) => {
     guard(a.secret);
-    const [teams, trades, strategies, positions, approvals, events, applications] = await Promise.all([
+    const [teams, trades, strategies, positions, approvals, events, applications, fees] = await Promise.all([
       ctx.db.query("teams").collect(),
       ctx.db.query("trades").collect(),
       ctx.db.query("strategies").collect(),
@@ -20,7 +20,9 @@ export const overview = query({
       ctx.db.query("approvals").withIndex("by_status", (q) => q.eq("status", "pending")).collect(),
       ctx.db.query("events").order("desc").take(60),
       ctx.db.query("applications").collect(),
+      ctx.db.query("fees").collect(),
     ]);
+    const feeSum = (status: "paid" | "owed") => fees.filter((f) => f.status === status).reduce((t, f) => t + BigInt(f.wei), 0n).toString();
     const volumeWei = trades.reduce((t, x) => t + BigInt(x.wei), 0n);
     const byOwner = new Map<string, { trades: number; volumeWei: bigint; strategies: number; open: number }>();
     const row = (o: string) => byOwner.get(o) ?? byOwner.set(o, { trades: 0, volumeWei: 0n, strategies: 0, open: 0 }).get(o)!;
@@ -36,6 +38,8 @@ export const overview = query({
         autoStrategies: strategies.filter((s) => s.active && s.mode === "auto").length,
         openPositions: positions.filter((p) => p.closedAt === undefined).length,
         pendingApprovals: approvals.length,
+        feesPaidWei: feeSum("paid"),
+        feesOwedWei: feeSum("owed"),
         applications: { pending: applications.filter((x) => x.status === "pending").length, approved: applications.filter((x) => x.status === "approved").length, rejected: applications.filter((x) => x.status === "rejected").length },
       },
       teams: teams

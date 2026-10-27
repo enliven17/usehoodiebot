@@ -20,6 +20,13 @@ export default function Terms() {
         <li>You are responsible for following the laws that apply to you, including on trading digital assets.</li>
         <li>You only fund the wallet with what you can afford to lose.</li>
       </ul>
+      <h2>Fees and access</h2>
+      <p>
+        Hoodie takes 0.5% of the ETH in every buy and every sell your team makes, by hand, by approval or automatically, sent from the
+        team wallet right after the trade. The order ticket shows it before you trade. Network fees are on top. Access is by
+        application; once $HOODIE launches, using Hoodie also takes holding the amount of $HOODIE the app shows in the wallet you sign in
+        with. Fees and the holding can change; the app always shows the current ones.
+      </p>
       <h2>No advice, no guarantees</h2>
       <p>
         Nothing Hoodie says is financial advice. Market data comes from third parties and can be late or wrong. The model can be

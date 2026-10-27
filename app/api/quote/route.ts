@@ -1,5 +1,6 @@
 import { parseEther } from "viem";
 
+import { afterFee, FEE_BPS } from "@/lib/server/fees";
 import { errorText, fail, requireTeam } from "@/lib/server/http";
 import { getExecutor, normalizeToken } from "@/lib/server/team";
 
@@ -23,9 +24,11 @@ export async function GET(req: Request) {
       if (!(pct > 0 && pct <= 100)) return fail(400, "Bad request.");
       amount = ((await ex.tokenBalance(team.wallet, token)) * BigInt(Math.round(pct * 100))) / 10_000n;
     }
-    if (amount <= 0n) return Response.json({ in: 0, out: 0, spot: null });
-    const [out, spot] = await Promise.all([ex.quote(token, side, amount), ex.prices([token]).then((m) => m.get(token) ?? null)]);
-    return Response.json({ in: Number(amount) / 1e18, out: Number(out) / 1e18, spot });
+    const feePct = Number(FEE_BPS) / 100;
+    if (amount <= 0n) return Response.json({ in: 0, out: 0, spot: null, feePct });
+    // the commission: off the ETH going in on a buy, off the ETH coming back on a sell
+    const [out, spot] = await Promise.all([ex.quote(token, side, side === "buy" ? afterFee(amount) : amount), ex.prices([token]).then((m) => m.get(token) ?? null)]);
+    return Response.json({ in: Number(amount) / 1e18, out: Number(side === "buy" ? out : afterFee(out)) / 1e18, spot, feePct });
   } catch (err) {
     return fail(502, errorText(err));
   }

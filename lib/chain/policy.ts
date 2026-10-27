@@ -5,7 +5,8 @@
  *   - call a Pons curve's buy or sell paying out to the wallet itself, or sweepFees (each launch has its own curve,
  *     so curves are matched by function and recipient, not address);
  *   - approve a spender (a curve or Permit2 pulls the tokens on a sell) or let Permit2 hand the router an allowance;
- *   - send to the owner or the treasury (the shutdown sweep).
+ *   - send to the owner or the treasury (the shutdown sweep);
+ *   - send Hoodie's commission to the fee wallet, at most MAX_FEE_WEI a transfer.
  * Every rule but the owner payout also caps the ETH it may carry: nothing on sells, approvals, sweeps, Permit2 and the
  * escrow; at most MAX_TRADE_WEI on a buy or a router swap; at most MAX_LAUNCH_WEI to the factory. So even a signer
  * steered into a hostile call (a fake curve, crafted router calldata) cannot move more than one trade's worth.
@@ -21,6 +22,8 @@ import { PERMIT2, UNIVERSAL_ROUTER } from "./v4";
 /** The largest buy a strategy may size (lib/strategy.ts SPEC_LIMITS), and headroom over the live 0.0005 ETH launch fee. */
 export const MAX_TRADE_WEI = 10n ** 18n;
 export const MAX_LAUNCH_WEI = 10n ** 16n;
+/** The most one commission transfer may carry: 0.05 ETH, the fee on a 10 ETH trade at 0.5%. */
+export const MAX_FEE_WEI = 5n * 10n ** 16n;
 
 type Condition = { field_source: "ethereum_transaction" | "ethereum_calldata"; field: string; operator: "eq" | "in" | "lte"; value: string | string[]; abi?: unknown[] };
 type Rule = { name: string; method: "eth_signTransaction"; conditions: Condition[]; action: "ALLOW" };
@@ -31,7 +34,7 @@ const fn = (name: string, inputs: Array<[string, string]>) => ({ type: "function
 const CURVE_ABI = [fn("buy", [["quoteIn", "uint256"], ["minTokensOut", "uint256"], ["recipient", "address"]]), fn("sell", [["tokensIn", "uint256"], ["minQuoteOut", "uint256"], ["recipient", "address"]]), fn("sweepFees", [["minBuybackTokensOut", "uint256"]])];
 const APPROVE_ABI = [fn("approve", [["spender", "address"], ["amount", "uint256"]])];
 
-export function robinhoodAgentPolicy(wallet: string, owner: string, treasury: string | null): EvmPolicyInput {
+export function robinhoodAgentPolicy(wallet: string, owner: string, treasury: string | null, feeWallet?: string): EvmPolicyInput {
   const lower = (a: string) => a.toLowerCase();
   const rule = (name: string, ...conditions: Condition[]): Rule => ({ name, method: "eth_signTransaction", conditions: [onChain, ...conditions], action: "ALLOW" });
   const call = (field: string, operator: "eq" | "in", value: string | string[], abi: unknown[]): Condition => ({ field_source: "ethereum_calldata", field, operator, value, abi });
@@ -52,6 +55,7 @@ export function robinhoodAgentPolicy(wallet: string, owner: string, treasury: st
       rule("Sweep its curve's fees", call("function_name", "eq", "sweepFees", CURVE_ABI), noValue),
       rule("Approve a token spender", call("function_name", "eq", "approve", APPROVE_ABI), noValue),
       rule("Pay the owner or the treasury", to(owner, ...(treasury ? [treasury] : []))),
+      ...(feeWallet && lower(feeWallet) !== lower(owner) ? [rule("Hoodie commission", to(feeWallet), valueAtMost(MAX_FEE_WEI))] : []),
     ],
   };
 }

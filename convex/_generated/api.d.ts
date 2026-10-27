@@ -15,6 +15,7 @@ import type * as book from "../book.js";
 import type * as chat from "../chat.js";
 import type * as crons from "../crons.js";
 import type * as events from "../events.js";
+import type * as fees from "../fees.js";
 import type * as guard from "../guard.js";
 import type * as strategies from "../strategies.js";
 import type * as teams from "../teams.js";
@@ -33,6 +34,7 @@ declare const fullApi: ApiFromModules<{
   chat: typeof chat;
   crons: typeof crons;
   events: typeof events;
+  fees: typeof fees;
   guard: typeof guard;
   strategies: typeof strategies;
   teams: typeof teams;

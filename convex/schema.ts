@@ -99,6 +99,17 @@ export default defineSchema({
     .index("by_owner", ["owner"])
     .index("by_status", ["status"]),
 
+  /** Hoodie's commission on each fill: paid (with its transfer) or owed until the tick sends it. */
+  fees: defineTable({
+    owner: v.string(),
+    side: v.union(v.literal("buy"), v.literal("sell")),
+    token: v.string(),
+    wei: v.string(),
+    tradeHash: v.string(),
+    status: v.union(v.literal("paid"), v.literal("owed")),
+    hash: v.optional(v.string()),
+  }).index("by_status", ["status"]),
+
   trades: defineTable({
     owner: v.string(),
     side: v.union(v.literal("buy"), v.literal("sell")),

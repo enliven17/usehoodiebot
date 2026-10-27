@@ -48,6 +48,24 @@ export const release = mutation({
   },
 });
 
+/** Every team, for maintenance scripts (policy upgrades). */
+export const all = query({
+  args: { secret },
+  handler: async (ctx, a) => {
+    guard(a.secret);
+    return (await ctx.db.query("teams").collect()).map((t) => ({ owner: t.owner, wallet: t.wallet, walletId: t.walletId, policyId: t.policyId }));
+  },
+});
+
+export const setPolicy = mutation({
+  args: { secret, owner: v.string(), policyId: v.string() },
+  handler: async (ctx, a) => {
+    guard(a.secret);
+    const t = await byOwner(ctx.db, a.owner);
+    if (t) await ctx.db.patch(t._id, { policyId: a.policyId });
+  },
+});
+
 /** Starts a chat past every thread used so far; an open chat with nothing in it is kept instead. */
 export const newThread = mutation({
   args: { secret, owner: v.string() },

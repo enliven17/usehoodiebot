@@ -3,7 +3,7 @@ import { test } from "node:test";
 
 import { toCandidate } from "./market";
 import { minOut, quoteCurveBuy, quoteCurveSell } from "./pons";
-import { MAX_TRADE_WEI, robinhoodAgentPolicy } from "./policy";
+import { MAX_FEE_WEI, MAX_TRADE_WEI, robinhoodAgentPolicy } from "./policy";
 
 const r = { quote: 1_680_000_000_000_000_000n, tokens: 1_000_000_000n * 10n ** 18n, feeBps: 100n, taxBps: 0n };
 
@@ -45,4 +45,14 @@ test("policy: every rule pinned to chain 4663, and only the owner payout carries
   const cap = (name: string) => p.rules.find((r) => r.name === name)!.conditions.find((c) => c.field === "value")!.value;
   assert.equal(cap("Curve sell to itself"), "0x0");
   assert.equal(BigInt(cap("Curve buy to itself") as string), MAX_TRADE_WEI);
+});
+
+test("policy: the commission goes only to the fee wallet, capped per transfer", () => {
+  const fee = "0x3333333333333333333333333333333333333333";
+  const p = robinhoodAgentPolicy("0x1111111111111111111111111111111111111111", "0x2222222222222222222222222222222222222222", null, fee);
+  const rule = p.rules.find((r) => r.name === "Hoodie commission")!;
+  assert.deepEqual(rule.conditions.find((c) => c.field === "to")!.value, [fee]);
+  assert.equal(BigInt(rule.conditions.find((c) => c.field === "value")!.value as string), MAX_FEE_WEI);
+  // the owner as fee wallet (the admin trading) needs no second rule: their payout rule already covers it
+  assert.ok(!robinhoodAgentPolicy("0x1111111111111111111111111111111111111111", fee, null, fee).rules.some((r) => r.name === "Hoodie commission"));
 });

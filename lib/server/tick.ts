@@ -9,7 +9,8 @@ import { api, mutate, query } from "../db";
 import { exitReason, parseSpec, rejects, sizeFor, type Spec } from "../strategy";
 import { safeMessage } from "./errors";
 import { eth, fillEvent, logEvent } from "./events";
-import { APPROVAL_TTL_MS, getExecutor, getTeam, propose, SentTrade, trade, tradeNow, type Team } from "./team";
+import { feeOf } from "./fees";
+import { APPROVAL_TTL_MS, chargeFee, collectFees, getExecutor, getTeam, propose, SentTrade, trade, tradeNow, withLease, type Team } from "./team";
 
 type Strategy = { id: string; owner: string; name: string; spec: unknown; mode: "ask" | "auto" };
 
@@ -21,6 +22,7 @@ export async function tick() {
   const log: string[] = [];
   await mutate(api.approvals.expire, { ttlMs: APPROVAL_TTL_MS });
   log.push(...(await settle()));
+  log.push(...(await collectFees().catch((err) => [`fees: ${safeMessage(err)}`])));
   log.push(...(await handExits().catch((err) => [`hand exits: ${safeMessage(err)}`])));
   const strategies = await query(api.strategies.active, {});
   if (!strategies.length) return log;
@@ -160,11 +162,16 @@ async function settle() {
     if (fill === "reverted") {
       await mutate(api.approvals.finish, { id, status: "failed", result: { hash, error: "The transaction reverted." } });
     } else if (a.kind === "buy") {
-      await mutate(api.book.bought, { owner: a.owner, strategyId: (a.strategyId ?? undefined) as Id<"strategies"> | undefined, token: a.token, symbol: a.symbol, tokens: fill.tokens.toString(), wei: fill.wei.toString(), hash });
+      // the swap carried the amount less the commission; the commission is still to be sent
+      const fee = feeOf(BigInt(a.amount));
+      await mutate(api.book.bought, { owner: a.owner, strategyId: (a.strategyId ?? undefined) as Id<"strategies"> | undefined, token: a.token, symbol: a.symbol, tokens: fill.tokens.toString(), wei: (fill.wei + fee).toString(), hash });
+      await withLease(a.owner, () => chargeFee(team, { side: "buy", token: a.token, wei: fee, tradeHash: hash }));
       await mutate(api.approvals.finish, { id, status: "done", result: { hash, wei: fill.wei.toString(), tokens: fill.tokens.toString() } });
     } else {
       const held = await ex.tokenBalance(team.wallet, a.token);
-      await mutate(api.book.sold, { owner: a.owner, token: a.token, symbol: a.symbol, tokens: fill.tokens.toString(), wei: fill.wei.toString(), hash, closes: held === 0n });
+      const fee = feeOf(fill.wei);
+      await mutate(api.book.sold, { owner: a.owner, token: a.token, symbol: a.symbol, tokens: fill.tokens.toString(), wei: (fill.wei - fee).toString(), hash, closes: held === 0n });
+      await withLease(a.owner, () => chargeFee(team, { side: "sell", token: a.token, wei: fee, tradeHash: hash }));
       await mutate(api.approvals.finish, { id, status: "done", result: { hash, wei: fill.wei.toString(), tokens: fill.tokens.toString() } });
     }
     if (fill !== "reverted") await logEvent(a.owner, fillEvent(a.kind, a.symbol, a.token, fill, "once it confirmed"));
