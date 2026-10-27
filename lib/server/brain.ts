@@ -2,13 +2,13 @@ import "server-only";
 
 import Anthropic from "@anthropic-ai/sdk";
 
-import { sql } from "../db";
+import { api, mutate, query } from "../db";
 import { apiTools, runTool } from "./tools";
 import type { Team } from "./team";
 
 type Msg = Anthropic.Beta.BetaMessageParam;
 type Content = Anthropic.Beta.BetaMessageContentParam;
-export type Row = { id: string; role: "user" | "assistant"; content: Content; created_at: string };
+export type Row = { id: string; role: "user" | "assistant"; content: Content };
 
 const MODEL = "claude-opus-5-5";
 const MAX_STEPS = 8;
@@ -36,14 +36,10 @@ How you work:
 let client: Anthropic | null = null;
 const anthropic = () => (client ??= new Anthropic());
 
-async function history(team: Team): Promise<{ thread: number; rows: Row[] }> {
-  const [{ thread }] = (await sql<{ thread: number }>`select thread from teams where owner = ${team.owner}`) as [{ thread: number }];
-  const rows = await sql<Row>`select id, role, content, created_at from messages where owner = ${team.owner} and thread = ${thread} order by id`;
-  return { thread, rows };
-}
+const history = (team: Team) => query(api.chat.thread, { owner: team.owner }) as Promise<{ thread: number; rows: Row[] }>;
 
 export async function newThread(owner: string) {
-  await sql`update teams set thread = thread + 1 where owner = ${owner}`;
+  await mutate(api.teams.newThread, { owner });
 }
 
 export async function thread(team: Team): Promise<Row[]> {
@@ -60,10 +56,10 @@ export async function chat(team: Team, text: string): Promise<Row[]> {
   }
   const messages: Msg[] = rows.map((r) => ({ role: r.role, content: r.content }));
   const added: Row[] = [];
-  const append = async (m: Msg) => {
+  const append = async (m: { role: "user" | "assistant"; content: Content }) => {
     messages.push(m);
-    const [row] = await sql<Row>`insert into messages (owner, thread, role, content) values (${team.owner}, ${thread}, ${m.role}, ${JSON.stringify(m.content)}::jsonb) returning id, role, content, created_at`;
-    added.push(row!);
+    const id = await mutate(api.chat.append, { owner: team.owner, thread, role: m.role, content: JSON.stringify(m.content) });
+    added.push({ id, role: m.role, content: m.content });
   };
   await append({ role: "user", content: [{ type: "text", text: text.slice(0, 4000) }] });
 

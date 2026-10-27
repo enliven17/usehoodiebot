@@ -8,7 +8,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (team instanceof Response) return team;
   const { id } = await params;
   const body = (await req.json().catch(() => null)) as { approve?: unknown } | null;
-  if (!/^[0-9a-f-]{36}$/.test(id) || typeof body?.approve !== "boolean") return fail(400, "Bad request.");
+  if (!/^[a-z0-9]{8,64}$/.test(id) || typeof body?.approve !== "boolean") return fail(400, "Bad request.");
   try {
     return Response.json(await decide(team.owner, id, body.approve));
   } catch (err) {

@@ -7,10 +7,10 @@ import { addressUrl } from "../chain/robinhood";
 import { candidates, type Candidate } from "../chain/market";
 import { FACTORY_ABI, PONS_FACTORY } from "../chain/pons";
 import { publicClient } from "../chain/robinhood";
-import { sql } from "../db";
+import { api, mutate, query } from "../db";
 import { describe, parseSpec, SPEC_LIMITS, WATCH_LABEL } from "../strategy";
 import type { Member } from "../team";
-import { getExecutor, normalizeToken, propose, type Position, type Team } from "./team";
+import { getExecutor, normalizeToken, propose, type Team } from "./team";
 
 type Tool = Anthropic.Beta.BetaTool & { member: Member; run: (team: Team, input: Record<string, unknown>) => Promise<unknown> };
 
@@ -62,14 +62,14 @@ export const TOOLS: Tool[] = [
     input_schema: obj({}),
     async run(team) {
       const ex = getExecutor();
-      const open = await sql<Position>`select token, symbol, tokens, cost_wei, opened_at from positions where owner = ${team.owner} and closed_at is null order by opened_at`;
+      const open = await query(api.book.open, { owner: team.owner });
       const [spendable, prices] = await Promise.all([ex.spendable(team.wallet), ex.prices(open.map((p) => p.token))]);
       return {
         wallet: team.wallet, spendableEth: formatEther(spendable),
         positions: open.map((p) => {
           const price = prices.get(p.token);
           const value = price === undefined ? null : (Number(p.tokens) / 1e18) * price;
-          return { token: p.token, symbol: p.symbol, costEth: formatEther(BigInt(p.cost_wei)), valueEth: value === null ? null : value.toFixed(6), openedAt: p.opened_at };
+          return { token: p.token, symbol: p.symbol, costEth: formatEther(BigInt(p.costWei)), valueEth: value === null ? null : value.toFixed(6), openedAt: new Date(p.openedAt).toISOString() };
         }),
       };
     },
@@ -93,10 +93,9 @@ export const TOOLS: Tool[] = [
     input_schema: obj({ name: { type: "string" }, mode: { type: "string", enum: ["ask", "auto"] }, spec: SPEC_SCHEMA }, ["name", "mode", "spec"]),
     async run(team, i) {
       const spec = parseSpec(i.spec);
-      const [{ count }] = (await sql<{ count: number }>`select count(*)::int as count from strategies where owner = ${team.owner} and active`) as [{ count: number }];
-      if (count >= 5) return { error: "Five strategies are already running. Pause one first." };
-      const [row] = await sql<{ id: string }>`insert into strategies (owner, name, spec, mode) values (${team.owner}, ${String(i.name).slice(0, 60)}, ${JSON.stringify(spec)}::jsonb, ${i.mode === "auto" ? "auto" : "ask"}) returning id`;
-      return { id: row!.id, watching: WATCH_LABEL[spec.watch], rules: describe(spec), mode: i.mode === "auto" ? "trades automatically" : "asks before each trade" };
+      const id = await mutate(api.strategies.create, { owner: team.owner, name: String(i.name).slice(0, 60), spec, mode: i.mode === "auto" ? "auto" : "ask", limit: 5 });
+      if (!id) return { error: "Five strategies are already running. Pause one first." };
+      return { id, watching: WATCH_LABEL[spec.watch], rules: describe(spec), mode: i.mode === "auto" ? "trades automatically" : "asks before each trade" };
     },
   },
   {
@@ -104,7 +103,7 @@ export const TOOLS: Tool[] = [
     description: "The owner's strategies with their rules, mode and whether they are running.",
     input_schema: obj({}),
     async run(team) {
-      const rows = await sql<{ id: string; name: string; spec: unknown; mode: string; active: boolean }>`select id, name, spec, mode, active from strategies where owner = ${team.owner} order by created_at desc`;
+      const rows = await query(api.strategies.byOwner, { owner: team.owner });
       return rows.map((r) => ({ id: r.id, name: r.name, mode: r.mode, active: r.active, watching: WATCH_LABEL[parseSpec(r.spec).watch], rules: describe(parseSpec(r.spec)) }));
     },
   },
@@ -113,8 +112,8 @@ export const TOOLS: Tool[] = [
     description: "Pause, resume, or switch a strategy between 'ask' and 'auto'.",
     input_schema: obj({ id: { type: "string" }, active: { type: "boolean" }, mode: { type: "string", enum: ["ask", "auto"] } }, ["id"]),
     async run(team, i) {
-      const [row] = await sql<{ id: string }>`update strategies set active = coalesce(${typeof i.active === "boolean" ? i.active : null}::boolean, active), mode = coalesce(${i.mode === "ask" || i.mode === "auto" ? i.mode : null}::text, mode) where id = ${String(i.id)}::uuid and owner = ${team.owner} returning id`;
-      return row ? { ok: true } : { error: "No such strategy." };
+      const ok = await mutate(api.strategies.update, { owner: team.owner, id: String(i.id), ...(typeof i.active === "boolean" ? { active: i.active } : {}), ...(i.mode === "ask" || i.mode === "auto" ? { mode: i.mode } : {}) });
+      return ok ? { ok: true } : { error: "No such strategy." };
     },
   },
   {
