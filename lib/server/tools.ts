@@ -89,13 +89,14 @@ export const TOOLS: Tool[] = [
   },
   {
     name: "create_strategy", member: "sniper",
-    description: "Save a Strategy SniperBot checks every minute. mode 'ask' puts each match up for approval; 'auto' trades it without asking. Use 'ask' unless the owner clearly asked for automatic trading.",
-    input_schema: obj({ name: { type: "string" }, mode: { type: "string", enum: ["ask", "auto"] }, spec: SPEC_SCHEMA }, ["name", "mode", "spec"]),
+    description: "Save a Strategy SniperBot checks every minute. Every match is put up for the owner's approval. Only the owner can switch a strategy to automatic trading, from the Strategies panel.",
+    input_schema: obj({ name: { type: "string" }, spec: SPEC_SCHEMA }, ["name", "spec"]),
     async run(team, i) {
       const spec = parseSpec(i.spec);
-      const id = await mutate(api.strategies.create, { owner: team.owner, name: String(i.name).slice(0, 60), spec, mode: i.mode === "auto" ? "auto" : "ask", limit: 5 });
+      // Always "ask": tool input can be steered by token names in market data, so the model never turns on automatic trading.
+      const id = await mutate(api.strategies.create, { owner: team.owner, name: String(i.name).slice(0, 60), spec, mode: "ask", limit: 5 });
       if (!id) return { error: "Five strategies are already running. Pause one first." };
-      return { id, watching: WATCH_LABEL[spec.watch], rules: describe(spec), mode: i.mode === "auto" ? "trades automatically" : "asks before each trade" };
+      return { id, watching: WATCH_LABEL[spec.watch], rules: describe(spec), mode: "asks before each trade; the owner can switch it to automatic in the Strategies panel" };
     },
   },
   {
@@ -109,10 +110,10 @@ export const TOOLS: Tool[] = [
   },
   {
     name: "update_strategy", member: "sniper",
-    description: "Pause, resume, or switch a strategy between 'ask' and 'auto'.",
-    input_schema: obj({ id: { type: "string" }, active: { type: "boolean" }, mode: { type: "string", enum: ["ask", "auto"] } }, ["id"]),
+    description: "Pause or resume a strategy. Switching to automatic trading is only possible for the owner, in the Strategies panel.",
+    input_schema: obj({ id: { type: "string" }, active: { type: "boolean" } }, ["id", "active"]),
     async run(team, i) {
-      const ok = await mutate(api.strategies.update, { owner: team.owner, id: String(i.id), ...(typeof i.active === "boolean" ? { active: i.active } : {}), ...(i.mode === "ask" || i.mode === "auto" ? { mode: i.mode } : {}) });
+      const ok = await mutate(api.strategies.update, { owner: team.owner, id: String(i.id), ...(typeof i.active === "boolean" ? { active: i.active } : {}) });
       return ok ? { ok: true } : { error: "No such strategy." };
     },
   },
