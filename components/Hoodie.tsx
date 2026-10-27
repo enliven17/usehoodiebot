@@ -21,7 +21,10 @@ function definition(member: Member): AvatarDefinition {
   return d;
 }
 
-export function Hoodie({ member = "hoodiebot", mood = "idle", size = 96, label }: { member?: Member; mood?: Mood; size?: number | string; label?: string }) {
+/** `still` holds one expression (brand images); otherwise the mood animation plays. */
+export function Hoodie({ member = "hoodiebot", mood = "idle", size = 96, label, still }: { member?: Member; mood?: Mood; size?: number | string; label?: string; still?: string }) {
   const d = useMemo(() => definition(member), [member]);
-  return <Avatar key={`${member}:${mood}`} definition={d} defaultAnimation={mood} size={size} ariaLabel={label ?? TEAM[member].name} />;
+  const name = label ?? TEAM[member].name;
+  if (still) return <Avatar key={`${member}:${still}`} definition={d} defaultExpression={still} size={size} ariaLabel={name} />;
+  return <Avatar key={`${member}:${mood}`} definition={d} defaultAnimation={mood} size={size} ariaLabel={name} />;
 }
