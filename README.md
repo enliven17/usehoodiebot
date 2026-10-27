@@ -1,10 +1,12 @@
 # HOODIEBOT
 
+Live: https://hoodiebot.vercel.app (Vercel `cankats-projects/hoodiebot`, Convex `hoodiebot`: dev `amiable-basilisk-273`, prod `quiet-setter-314`)
+
 Your private trading team on Robinhood Chain. You talk to HOODIEBOT; it hands the work to ResearchBot, SniperBot,
 TraderBot and LaunchBot, and they trade Pons tokens from a wallet that belongs to your team alone.
 
 - **Site**: landing, litepaper, terms, privacy (`app/`)
-- **App** (`/app`): sign in with a wallet, chat, approvals, the team wallet, positions, strategies, activity
+- **App** (`/app`): ConnectKit sign-in, chat, approvals, the team wallet with P&L, the decisions timeline, positions, strategies
 - **Brand**: `brand/` (logo, X profile and banner, posts, kit sheets) and `public/og/` (link previews)
 
 ## Stack
@@ -13,7 +15,8 @@ TraderBot and LaunchBot, and they trade Pons tokens from a wallet that belongs t
 |---|---|
 | Web | Next.js 16 on Vercel, plain CSS on Kurage tokens (`app/globals.css`) |
 | Data | Convex (`convex/`), called only from the Next server with `HOODIEBOT_SECRET` |
-| Brain | Claude Opus 5.5 with tools (`lib/server/brain.ts`, `lib/server/tools.ts`) |
+| Brain | OpenRouter (Claude Sonnet 5.5), then Groq, then Gemini, keys rotating (`lib/server/llm.ts`, `brain.ts`, `tools.ts`) |
+| Wallet connect | Family's ConnectKit + wagmi, Kurage theme (`components/app/Wallets.tsx`); `.npmrc` has legacy-peer-deps for its React 18 peer range |
 | Wallets | Privy server wallets under a deny-by-default policy (`lib/chain/policy.ts`) |
 | Chain | Robinhood Chain 4663, Pons V2 curves and Uniswap v4 (`lib/chain/`) |
 | Market | GeckoTerminal (`lib/chain/market.ts`) |
@@ -30,7 +33,9 @@ npx convex env set HOODIEBOT_SECRET <same as .env.local>
 npm run dev
 ```
 
-Checks: `npm run typecheck`, `npm test`, `npx convex dev --once` (deploys and typechecks the Convex functions).
+Checks: `npm run typecheck`, `npm test`, `npx convex dev --once` (deploys and typechecks the Convex functions),
+`npm run e2e -- <url> [--strategy]` (signs in with a throwaway key, creates an empty team wallet, chats; with
+`--strategy` also waits for the minute tick to match a token and checks the approval is refused for lack of ETH).
 
 ## Environment
 
@@ -41,7 +46,8 @@ Checks: `npm run typecheck`, `npm test`, `npx convex dev --once` (deploys and ty
 | `SESSION_SECRET` | Vercel | 32+ characters; signs the session cookie |
 | `CRON_SECRET` | Vercel + Convex | authorizes `/api/cron/tick` |
 | `SITE_URL` | Convex | e.g. `https://usehoodiebot.com`, where the cron sends the tick |
-| `ANTHROPIC_API_KEY` | Vercel | Claude |
+| `OPENROUTER_API_KEYS`, `GROQ_API_KEYS`, `GEMINI_API_KEYS` | Vercel | the brain; comma-separated keys rotate, `*_MODELS` override the model order |
+| `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | Vercel | Reown project; its domain allowlist must include the site |
 | `PRIVY_APP_ID`, `PRIVY_APP_SECRET` | Vercel | Privy app |
 | `PRIVY_AUTHORIZATION_KEY` | Vercel | `wallet-auth:…` P-256 key; owns every wallet and policy, required in production |
 | `ROBINHOOD_RPC` | Vercel | a provider endpoint; the public RPC is rate limited |
