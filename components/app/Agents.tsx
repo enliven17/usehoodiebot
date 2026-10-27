@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import { Hoodie, type Mood } from "@/components/Hoodie";
 import { ago } from "@/lib/format";
+import { PRESETS, type Preset } from "@/lib/presets";
 import { MEMBERS, TEAM, type Member } from "@/lib/team";
 
 import { api, type Snapshot } from "./api";
@@ -28,6 +29,12 @@ const MOOD: Record<Member, Mood> = { hoodiebot: "idle", research: "searching", s
  */
 export function Agents({ snap, onChange }: { snap: Snapshot; onChange: () => void }) {
   const [building, setBuilding] = useState(false);
+  const [preset, setPreset] = useState<Preset | null>(null);
+  const open = (p: Preset | null) => {
+    setPreset(p);
+    setBuilding(true);
+    requestAnimationFrame(() => document.getElementById("builder")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  };
   return (
     <div className={s.agentsPage}>
       <h1 className={s.pageTitle}>Your team</h1>
@@ -56,11 +63,24 @@ export function Agents({ snap, onChange }: { snap: Snapshot; onChange: () => voi
 
       <section className={s.agentsSection}>
         <Strategies snap={snap} onChange={onChange} />
-        <button type="button" className={`btn ${s.newStrategy}`} aria-expanded={building} onClick={() => setBuilding(!building)}>{building ? "Close the builder" : "New strategy"}</button>
+        <h2 className={s.blockTitle}>Ready-made strategies</h2>
+        <ul className={s.presetsGrid}>
+          {PRESETS.map((p) => (
+            <li key={p.id} className={s.presetCard}>
+              <p className={s.presetHead}><strong>{p.name}</strong><span className={s.risk} data-risk={p.risk}>{p.risk} risk</span></p>
+              <p className={s.presetPitch}>{p.pitch}</p>
+              <p className={`num ${s.presetRules}`}>
+                {p.spec.sizeEth} ETH · ShieldBot {p.spec.minSafetyScore ?? "any"}+ · TP +{p.spec.takeProfitPct}% · SL -{p.spec.stopLossPct}%{p.spec.trailingStopPct ? ` · trail ${p.spec.trailingStopPct}%` : ""}
+              </p>
+              <button type="button" className="btn" onClick={() => open(p)}>Use this</button>
+            </li>
+          ))}
+        </ul>
+        <button type="button" className={`btn ${s.newStrategy}`} aria-expanded={building && !preset} onClick={() => (building && !preset ? setBuilding(false) : open(null))}>{building && !preset ? "Close the builder" : "Build your own"}</button>
         <AnimatePresence initial={false}>
           {building ? (
-            <motion.div key="builder" initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.3, ease: EASE }} style={{ overflow: "hidden" }}>
-              <Builder autopilot={snap.autopilot.on} onSaved={() => (setBuilding(false), onChange())} />
+            <motion.div key={preset?.id ?? "own"} id="builder" initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.3, ease: EASE }} style={{ overflow: "hidden" }}>
+              <Builder autopilot={snap.autopilot.on} preset={preset} onSaved={() => (setBuilding(false), setPreset(null), onChange())} />
             </motion.div>
           ) : null}
         </AnimatePresence>

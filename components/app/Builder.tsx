@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import type { Preset } from "@/lib/presets";
+
 import { api } from "./api";
 import s from "./app.module.css";
 
@@ -26,10 +28,16 @@ const FIELDS: Array<{ key: string; label: string; unit: string; placeholder: str
 const GROUPS = [["entry", "Entry"], ["filter", "What has to pass"], ["exit", "Exits"]] as const;
 
 /** A strategy built in the app, field by field, with the owner choosing whether it asks first or trades on its own. */
-export function Builder({ autopilot, onSaved }: { autopilot: boolean; onSaved: () => void }) {
-  const [name, setName] = useState("");
-  const [watch, setWatch] = useState<(typeof WATCH)[number][0]>("new");
-  const [v, setV] = useState<Record<string, string>>({ sizeEth: "0.01", maxOpen: "3", minSafetyScore: "60", slippagePct: "3", maxMcapUsd: "60000", minLiquidityUsd: "5000", minBuySellRatio: "1.5", takeProfitPct: "80", stopLossPct: "35" });
+const DEFAULTS: Record<string, string> = { sizeEth: "0.01", maxOpen: "3", minSafetyScore: "60", slippagePct: "3", maxMcapUsd: "60000", minLiquidityUsd: "5000", minBuySellRatio: "1.5", takeProfitPct: "80", stopLossPct: "35" };
+
+/** A preset's rules as the form's text fields. */
+const fromPreset = (p: Preset): Record<string, string> =>
+  Object.fromEntries(FIELDS.map((f) => [f.key, f.key === "slippagePct" ? String((p.spec.slippageBps ?? 300) / 100) : p.spec[f.key as keyof Preset["spec"]] === undefined ? "" : String(p.spec[f.key as keyof Preset["spec"]])]));
+
+export function Builder({ autopilot, preset, onSaved }: { autopilot: boolean; preset?: Preset | null; onSaved: () => void }) {
+  const [name, setName] = useState(preset?.name ?? "");
+  const [watch, setWatch] = useState<(typeof WATCH)[number][0]>(preset?.spec.watch ?? "new");
+  const [v, setV] = useState<Record<string, string>>(preset ? fromPreset(preset) : DEFAULTS);
   const [mode, setMode] = useState<"ask" | "auto">("ask");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
