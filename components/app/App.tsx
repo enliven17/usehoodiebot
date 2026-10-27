@@ -32,6 +32,7 @@ const STARTERS = [
 ] as const;
 
 type Panel = "chat" | "history" | "trade" | "team";
+const TITLES: Record<Panel, string> = { chat: "Chat", history: "Chats", trade: "Trade", team: "Wallet" };
 
 export function App({ signedIn }: { signedIn: boolean }) {
   const params = useSearchParams();
@@ -152,27 +153,48 @@ export function App({ signedIn }: { signedIn: boolean }) {
   return (
     <motion.div className={s.shell} data-panel={panel} data-side={sideOpen[sideKey] ? "open" : "closed"} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5, ease: EASE }}>
       <Field targetId="composer" />
+      <header className={s.topbar}>
+        <Link href="/" aria-label="HOODIEBOT home"><Mark size={22} /></Link>
+        <strong>{TITLES[panel]}</strong>
+        {panel === "chat" ? (
+          <button type="button" className={s.topBtn} onClick={() => api.newChat().then((r) => setLines(r.lines))} aria-label="New chat">
+            <svg className="i" viewBox="0 0 24 24"><path d="M12 5v14" /><path d="M5 12h14" /></svg>
+          </button>
+        ) : null}
+        {admin ? (
+          <Link href="/admin" className={s.topBtn} aria-label="Admin">
+            <svg className="i" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></svg>
+          </Link>
+        ) : null}
+        <button type="button" className={s.topBtn} onClick={() => api.logout().then(() => setAuthed(false))} aria-label="Sign out">
+          <svg className="i" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="m16 17 5-5-5-5" /><path d="M21 12H9" /></svg>
+        </button>
+      </header>
       <nav className={s.rail} aria-label="App">
         <Link href="/" className={s.railBrand} aria-label="HOODIEBOT home"><Mark size={26} /></Link>
         <button type="button" className={s.railBtn} aria-current={panel === "chat" ? "page" : undefined} onClick={() => setPanel("chat")} aria-label="Chat">
           <svg className="i" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
+          <span className={s.railLabel}>Chat</span>
         </button>
         <button type="button" className={s.railBtn} aria-current={panel === "history" ? "page" : undefined} onClick={() => setPanel("history")} aria-label="Past chats">
           <svg className="i" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /><path d="M12 7v5l4 2" /></svg>
+          <span className={s.railLabel}>Chats</span>
         </button>
         <button type="button" className={s.railBtn} aria-current={panel === "trade" ? "page" : undefined} onClick={() => setPanel("trade")} aria-label="Trade">
           <svg className="i" viewBox="0 0 24 24"><path d="M3 3v16a2 2 0 0 0 2 2h16" /><path d="m19 9-5 5-4-4-3 3" /></svg>
+          <span className={s.railLabel}>Trade</span>
         </button>
         <button type="button" className={s.railBtn} aria-current={panel === "team" ? "page" : undefined} aria-pressed={sideOpen[sideKey]} onClick={toggleWallet} aria-label="Team wallet">
           <svg className="i" viewBox="0 0 24 24"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" /><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" /></svg>
           {pending ? <span className={s.badge}>{pending}</span> : null}
+          <span className={s.railLabel}>Wallet</span>
         </button>
         {admin ? (
-          <Link href="/admin" className={`${s.railBtn} ${s.railEnd}`} aria-label="Admin">
+          <Link href="/admin" className={`${s.railBtn} ${s.railEnd} ${s.railDesk}`} aria-label="Admin">
             <svg className="i" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></svg>
           </Link>
         ) : null}
-        <button type="button" className={`${s.railBtn} ${admin ? "" : s.railEnd}`} onClick={() => api.logout().then(() => setAuthed(false))} aria-label="Sign out">
+        <button type="button" className={`${s.railBtn} ${s.railDesk} ${admin ? "" : s.railEnd}`} onClick={() => api.logout().then(() => setAuthed(false))} aria-label="Sign out">
           <svg className="i" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="m16 17 5-5-5-5" /><path d="M21 12H9" /></svg>
         </button>
       </nav>

@@ -50,7 +50,7 @@ export function Message({ line }: { line: Line }) {
       <Hoodie member={lead} size={34} mood="idle" />
       <div className={s.bubble}>
         {line.steps.length ? (
-          <p className={s.steps}>
+          <p className={s.toolSteps}>
             {line.steps.map((st, i) => (
               <span key={i} className={s.stepChip} style={{ ["--eye" as string]: TEAM[st.member as Member]?.eyes ?? TEAM.hoodiebot.eyes }}>
                 {TEAM[st.member as Member]?.name ?? "Hoodie"} {STEP_LABEL[st.tool] ?? st.tool}

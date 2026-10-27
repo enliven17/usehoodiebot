@@ -22,8 +22,9 @@ const floor6 = (n: number) => (Math.floor(n * 1e6) / 1e6).toString();
  * The order ticket: buy with ETH or sell a share of the bag, a live quote from the curve or pool (what comes back, the
  * minimum after slippage, the price impact with fees), slippage, and a take profit and stop loss the tick acts on.
  */
-export function Ticket({ pick, snap, view, last, onDone }: { pick: { token: string; symbol: string } | null; snap: Snapshot; view: TokenView | null; last: number | null; onDone: () => void }) {
-  const [side, setSide] = useState<"buy" | "sell">("buy");
+export function Ticket({ pick, snap, view, last, side: asked, onDone }: { pick: { token: string; symbol: string } | null; snap: Snapshot; view: TokenView | null; last: number | null; side?: "buy" | "sell"; onDone: () => void }) {
+  const [side, setSide] = useState<"buy" | "sell">(asked ?? "buy");
+  useEffect(() => void (asked && setSide(asked)), [asked]);
   const [amount, setAmount] = useState("0.01");
   const [pct, setPct] = useState(100);
   const [slip, setSlip] = useState("3");

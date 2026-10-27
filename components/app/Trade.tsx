@@ -32,6 +32,14 @@ export function Trade({ snap, onChange }: { snap: Snapshot; onChange: () => void
   const [bars, setBars] = useState<{ key: string; list: Candle[] } | null>(null);
   const [barsError, setBarsError] = useState(false);
   const [find, setFind] = useState("");
+  // phones: the order ticket is a sheet that slides up from the Buy and Sell bar
+  const [sheet, setSheet] = useState<"buy" | "sell" | null>(null);
+  useEffect(() => {
+    if (!sheet) return;
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setSheet(null);
+    window.addEventListener("keydown", esc);
+    return () => window.removeEventListener("keydown", esc);
+  }, [sheet]);
   // what was last seen per token, so going back to one shows it at once while it refreshes
   const views = useRef(new Map<string, TokenView>());
 
@@ -100,7 +108,7 @@ export function Trade({ snap, onChange }: { snap: Snapshot; onChange: () => void
   const decisions = pick ? snap.events.filter((e) => e.token === pick.token).slice(0, 8) : [];
 
   return (
-    <div className={s.trade}>
+    <div className={s.trade} data-sheet={sheet ?? undefined}>
       <aside className={s.tokens} aria-label="Tokens">
         <label htmlFor="find" className="sr-only">Find a token</label>
         <input id="find" className="field" placeholder="Symbol or address" value={find} onChange={(e) => setFind(e.target.value)} autoComplete="off" spellCheck={false} />
@@ -194,8 +202,14 @@ export function Trade({ snap, onChange }: { snap: Snapshot; onChange: () => void
         </div>
       </section>
 
+      <div className={s.tradeBar}>
+        <button type="button" className={`btn ${s.go}`} data-side="buy" onClick={() => setSheet("buy")}>Buy</button>
+        <button type="button" className={`btn ${s.go}`} data-side="sell" onClick={() => setSheet("sell")}>Sell</button>
+      </div>
+      <button type="button" className={s.scrim} aria-hidden tabIndex={-1} onClick={() => setSheet(null)} />
       <aside className={s.ticketCol} aria-label="Order">
-        <Ticket pick={pick} snap={snap} view={view} last={last} onDone={() => { void loadView(); onChange(); }} />
+        <button type="button" className={s.grabber} aria-label="Close the order" onClick={() => setSheet(null)} />
+        <Ticket pick={pick} snap={snap} view={view} last={last} side={sheet ?? undefined} onDone={() => { void loadView(); onChange(); }} />
       </aside>
     </div>
   );
