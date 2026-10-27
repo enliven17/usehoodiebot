@@ -22,6 +22,8 @@ export type Candidate = {
   symbol: string;
   /** The pool GeckoTerminal tracks it in: what the chart asks for candles. */
   pool?: string;
+  /** What it is priced in, from the pool name ("X / WETH"): only ETH pairs can be traded here. */
+  quote?: string;
   venue: Venue;
   priceEth: number | null;
   liquidityUsd?: number;
@@ -63,6 +65,7 @@ export function toCandidate(p: Pool, venue: Venue, now: number): Candidate | nul
   return {
     token: getAddress(raw),
     pool: a.address,
+    quote: (a.name ?? "").split(" / ")[1]?.trim(),
     symbol: (a.name ?? "").split(" / ")[0]?.trim() || raw.slice(0, 6),
     venue,
     priceEth: num(a.base_token_price_native_currency) ?? null,

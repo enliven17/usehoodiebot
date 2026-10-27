@@ -30,6 +30,7 @@ export function Ticket({ pick, snap, view, last, onDone }: { pick: { token: stri
   const [tp, setTp] = useState("");
   const [sl, setSl] = useState("");
   const [quote, setQuote] = useState<Quote | null>(null);
+  const [quoteError, setQuoteError] = useState<string | null>(null);
   const [quoting, setQuoting] = useState(false);
   const [msg, setMsg] = useState<{ text: string; hash?: string; bad?: boolean } | null>(null);
 
@@ -45,6 +46,7 @@ export function Ticket({ pick, snap, view, last, onDone }: { pick: { token: stri
   useEffect(() => {
     setMsg(null);
     setQuote(null);
+    setQuoteError(null);
   }, [pick?.token]);
   useEffect(() => {
     setTp(pos?.takeProfitPct ? String(pos.takeProfitPct) : "");
@@ -60,8 +62,8 @@ export function Ticket({ pick, snap, view, last, onDone }: { pick: { token: stri
     setQuoting(true);
     const t = setTimeout(() => {
       api.quote(side === "buy" ? { token: pick.token, side, eth: amount } : { token: pick.token, side, pct })
-        .then((q) => live && setQuote(q))
-        .catch(() => live && setQuote(null))
+        .then((q) => live && (setQuote(q), setQuoteError(null)))
+        .catch((err: Error) => live && (setQuote(null), setQuoteError(err.message)))
         .finally(() => live && setQuoting(false));
     }, 350);
     return () => {
@@ -142,6 +144,7 @@ export function Ticket({ pick, snap, view, last, onDone }: { pick: { token: stri
         </>
       )}
 
+      {quoteError ? <p className={`${s.note} down`} role="alert">{quoteError}</p> : null}
       <dl className={s.quote} aria-live="polite" data-loading={quoting || undefined}>
         <div><dt>You get</dt><dd className="num">{quote ? (side === "buy" ? `${qty(quote.out)} ${symbol}` : ethText(quote.out)) : "–"}</dd></div>
         <div><dt>Minimum, at {slipPct || 0}% slippage</dt><dd className="num">{min !== null ? (side === "buy" ? `${qty(min)} ${symbol}` : ethText(min)) : "–"}</dd></div>
