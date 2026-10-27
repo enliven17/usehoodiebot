@@ -14,6 +14,8 @@ export default defineSchema({
     busyToken: v.optional(v.string()),
     /** The open conversation. History is append-only within a thread; a new chat starts the next one. */
     thread: v.number(),
+    /** The highest thread number used: an older chat can be reopened, a new one always goes past this. */
+    lastThread: v.optional(v.number()),
   }).index("by_owner", ["owner"]),
 
   /** Each chat message as JSON text (OpenAI-style: user, assistant with tool calls, tool results). */
@@ -87,5 +89,7 @@ export default defineSchema({
     wei: v.string(),
     tokens: v.string(),
     hash: v.string(),
-  }).index("by_owner", ["owner"]),
+  })
+    .index("by_owner", ["owner"])
+    .index("by_owner_token", ["owner", "token"]),
 });

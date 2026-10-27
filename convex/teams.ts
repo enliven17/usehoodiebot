@@ -48,13 +48,30 @@ export const release = mutation({
   },
 });
 
+/** Starts a chat past every thread used so far; an open chat with nothing in it is kept instead. */
 export const newThread = mutation({
   args: { secret, owner: v.string() },
   handler: async (ctx, a) => {
     guard(a.secret);
     const t = await byOwner(ctx.db, a.owner);
     if (!t) return 0;
-    await ctx.db.patch(t._id, { thread: t.thread + 1 });
-    return t.thread + 1;
+    const used = await ctx.db.query("messages").withIndex("by_thread", (q) => q.eq("owner", a.owner).eq("thread", t.thread)).first();
+    if (!used) return t.thread;
+    const next = Math.max(t.thread, t.lastThread ?? 0) + 1;
+    await ctx.db.patch(t._id, { thread: next, lastThread: next });
+    return next;
+  },
+});
+
+/** Reopens an earlier chat; new messages carry on in it. */
+export const openThread = mutation({
+  args: { secret, owner: v.string(), thread: v.number() },
+  handler: async (ctx, a) => {
+    guard(a.secret);
+    const t = await byOwner(ctx.db, a.owner);
+    const last = Math.max(t?.thread ?? 0, t?.lastThread ?? 0);
+    if (!t || !Number.isInteger(a.thread) || a.thread < 0 || a.thread > last) return false;
+    await ctx.db.patch(t._id, { thread: a.thread, lastThread: last });
+    return true;
   },
 });

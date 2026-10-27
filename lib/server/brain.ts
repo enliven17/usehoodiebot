@@ -33,15 +33,18 @@ How you work:
 
 type Row = StoredRow & { content: ChatMessage };
 
-const history = (team: Team) => query(api.chat.thread, { owner: team.owner }) as Promise<{ thread: number; rows: Row[] }>;
+const history = (team: Team, thread?: number) => query(api.chat.thread, { owner: team.owner, thread }) as Promise<{ thread: number; rows: Row[] }>;
 
 export async function newThread(owner: string) {
   await mutate(api.teams.newThread, { owner });
 }
 
-export async function thread(team: Team): Promise<Row[]> {
-  return (await history(team)).rows;
+export async function thread(team: Team, n?: number): Promise<Row[]> {
+  return (await history(team, n)).rows;
 }
+
+export const threads = (owner: string) => query(api.chat.threads, { owner });
+export const openThread = (owner: string, thread: number) => mutate(api.teams.openThread, { owner, thread });
 
 /** The last CONTEXT messages, cut so the window opens on an owner message (never on an orphan tool result). */
 function contextOf(rows: Row[]): ChatMessage[] {

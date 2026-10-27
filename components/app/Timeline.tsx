@@ -3,15 +3,12 @@
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 import { addressUrl, txUrl } from "@/lib/chain/robinhood-urls";
+import { ago } from "@/lib/format";
 import { TEAM, type Member } from "@/lib/team";
 
 import type { Snapshot } from "./api";
 import s from "./app.module.css";
 
-const ago = (at: number) => {
-  const s = Math.max(0, Math.round((Date.now() - at) / 1000));
-  return s < 60 ? "now" : s < 3600 ? `${Math.floor(s / 60)}m` : s < 86_400 ? `${Math.floor(s / 3600)}h` : `${Math.floor(s / 86_400)}d`;
-};
 const ethOf = (wei: string) => {
   const n = Number(BigInt(wei)) / 1e18;
   return `${n > 0 ? "+" : ""}${n.toFixed(4)} ETH`;
