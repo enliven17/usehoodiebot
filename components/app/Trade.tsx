@@ -1,10 +1,10 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getAddress, isAddress } from "viem";
 
-import { StatusButton } from "@/components/ui/StatusButton";
+import { candles as loadCandles, type Candle, type Timeframe } from "@/lib/chain/market";
 import { addressUrl, txUrl } from "@/lib/chain/robinhood-urls";
 import { ago, price, usd } from "@/lib/format";
 import { TEAM, type Member } from "@/lib/team";
@@ -12,12 +12,12 @@ import { TEAM, type Member } from "@/lib/team";
 import { api, type MarketToken, type Snapshot, type TokenView } from "./api";
 import s from "./app.module.css";
 import { Chart } from "./Chart";
+import { Ticket } from "./Ticket";
 
-const TIMEFRAMES = ["1m", "5m", "15m", "1h", "4h", "1d"] as const;
-const BUYS = ["0.005", "0.01", "0.05"] as const;
-const SELLS = [25, 50, 100] as const;
-/** GeckoTerminal is shared by every owner (about 30 calls a minute); the server caches candles for 30 s. */
-const CHART_POLL_MS = 20_000;
+const TIMEFRAMES = ["1m", "5m", "15m", "1h", "4h", "1d"] as const satisfies readonly Timeframe[];
+/** Candles come from GeckoTerminal in the browser, so each owner has their own rate limit (about 30 calls a minute). */
+const CANDLE_POLL_MS = 15_000;
+const VIEW_POLL_MS = 20_000;
 const LIST_POLL_MS = 60_000;
 
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
@@ -26,10 +26,14 @@ const ethText = (n: number) => `${n.toFixed(4).replace(/\.?0+$/, "")} ETH`;
 /** A full trade screen: tokens, the chart with every buy and sell the team made, the position, and buy and sell by hand. */
 export function Trade({ snap, onChange }: { snap: Snapshot; onChange: () => void }) {
   const [tokens, setTokens] = useState<MarketToken[] | null>(null);
-  const [pick, setPick] = useState<{ token: string; symbol: string } | null>(null);
-  const [tf, setTf] = useState<(typeof TIMEFRAMES)[number]>("5m");
+  const [pick, setPick] = useState<{ token: string; symbol: string; pool?: string } | null>(null);
+  const [tf, setTf] = useState<Timeframe>("5m");
   const [view, setView] = useState<TokenView | null>(null);
+  const [bars, setBars] = useState<{ key: string; list: Candle[] } | null>(null);
+  const [barsError, setBarsError] = useState(false);
   const [find, setFind] = useState("");
+  // what was last seen per token, so going back to one shows it at once while it refreshes
+  const views = useRef(new Map<string, TokenView>());
 
   const loadList = useCallback(() => api.market().then((r) => setTokens(r.tokens)).catch(() => setTokens((t) => t ?? [])), []);
   useEffect(() => {
@@ -40,24 +44,46 @@ export function Trade({ snap, onChange }: { snap: Snapshot; onChange: () => void
 
   // first visit: the first token the team holds, else the busiest on Pons
   useEffect(() => {
-    if (!pick && tokens?.length) setPick({ token: tokens[0]!.token, symbol: tokens[0]!.symbol });
+    if (!pick && tokens?.length) setPick({ token: tokens[0]!.token, symbol: tokens[0]!.symbol, pool: tokens[0]!.pool });
   }, [tokens, pick]);
 
+  const token = pick?.token;
   const loadView = useCallback(async () => {
-    if (!pick) return;
+    if (!token) return;
     try {
-      const v = await api.token(pick.token, tf);
-      setView((old) => (old && v.candles.length === 0 && old.candles.length && old.market?.token === pick.token ? { ...v, candles: old.candles } : v));
+      const v = await api.token(token);
+      views.current.set(token, v);
+      setView(v);
     } catch {
       /* the next poll tries again */
     }
-  }, [pick, tf]);
+  }, [token]);
   useEffect(() => {
-    setView(null);
+    setView(token ? (views.current.get(token) ?? null) : null);
     void loadView();
-    const t = setInterval(() => !document.hidden && loadView(), CHART_POLL_MS);
+    const t = setInterval(() => !document.hidden && loadView(), VIEW_POLL_MS);
     return () => clearInterval(t);
-  }, [loadView]);
+  }, [token, loadView]);
+
+  // candles straight from GeckoTerminal: the pool from the list when it has one, else from the server's lookup
+  const pool = pick?.pool ?? view?.market?.pool;
+  useEffect(() => {
+    if (!pool) return;
+    const key = `${pool}-${tf}`;
+    let live = true;
+    const load = () =>
+      loadCandles(pool, tf)
+        .then((list) => live && (setBars({ key, list }), setBarsError(false)))
+        .catch(() => live && setBarsError(true));
+    setBarsError(false);
+    void load();
+    const t = setInterval(() => !document.hidden && load(), CANDLE_POLL_MS);
+    return () => {
+      live = false;
+      clearInterval(t);
+    };
+  }, [pool, tf]);
+  const shownBars = bars && pool && bars.key === `${pool}-${tf}` ? bars.list : null;
 
   const shown = useMemo(() => {
     const q = find.trim().toLowerCase();
@@ -66,12 +92,11 @@ export function Trade({ snap, onChange }: { snap: Snapshot; onChange: () => void
   }, [tokens, find]);
   const pasted = isAddress(find.trim()) && !shown.length ? getAddress(find.trim()) : null;
 
-  const last = view?.candles.at(-1)?.close ?? view?.market?.priceEth ?? null;
-  const first = view?.candles[0]?.open ?? null;
+  const last = shownBars?.at(-1)?.close ?? view?.market?.priceEth ?? null;
+  const first = shownBars?.[0]?.open ?? null;
   const change = last && first ? (last / first - 1) * 100 : null;
   const pos = view?.position ?? null;
   const entry = pos && pos.tokens > 0 ? pos.costEth / pos.tokens : null;
-  const value = pos && last ? pos.tokens * last : null;
   const decisions = pick ? snap.events.filter((e) => e.token === pick.token).slice(0, 8) : [];
 
   return (
@@ -91,7 +116,7 @@ export function Trade({ snap, onChange }: { snap: Snapshot; onChange: () => void
           ) : null}
           {shown.map((t, i) => (
             <li key={t.token} data-split={i > 0 && t.group === "market" && shown[i - 1]!.group !== "market" ? "" : undefined}>
-              <button type="button" className={s.tokenRow} aria-current={pick?.token === t.token ? "true" : undefined} onClick={() => setPick({ token: t.token, symbol: t.symbol })}>
+              <button type="button" className={s.tokenRow} aria-current={pick?.token === t.token ? "true" : undefined} onClick={() => setPick({ token: t.token, symbol: t.symbol, pool: t.pool })}>
                 <span className={s.tokenSym}>{t.symbol}</span>
                 <span className="num faint">{t.group === "held" ? "In wallet" : usd(t.mcapUsd)}</span>
                 <span className={s.tokenSub}>{t.venue === "graduated" ? "Uniswap" : t.curvePct !== undefined ? `Curve ${t.curvePct.toFixed(0)}%` : t.group === "traded" ? "Traded" : "Pons"}</span>
@@ -125,18 +150,17 @@ export function Trade({ snap, onChange }: { snap: Snapshot; onChange: () => void
           <div className={s.seg} role="group" aria-label="Candle size">
             {TIMEFRAMES.map((t) => <button key={t} type="button" aria-pressed={tf === t} onClick={() => setTf(t)}>{t}</button>)}
           </div>
-          <Chart candles={view?.candles ?? []} fills={view?.trades ?? []} entry={entry} fitKey={`${pick?.token}-${tf}`} />
+          <Chart candles={shownBars ?? []} fills={view?.trades ?? []} entry={entry} fitKey={`${pick?.token}-${tf}`} />
           <AnimatePresence>
-            {!view || !view.candles.length ? (
-              <motion.p key="state" className={s.chartState} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                {!view ? "Loading candles…" : "No trades in this window yet."}
+            {!shownBars?.length ? (
+              <motion.p key={barsError ? "error" : shownBars ? "empty" : "loading"} className={s.chartState} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                {barsError ? "GeckoTerminal is busy. Trying again in a few seconds…" : shownBars ? "No trades in this window yet." : view && !pool ? "No market data for this token yet." : <span className={s.chartLoading} aria-label="Loading candles" />}
               </motion.p>
             ) : null}
           </AnimatePresence>
         </div>
 
         <div className={s.deskGrid}>
-          <TradeBox pick={pick} snap={snap} pos={pos} value={value} entry={entry} onDone={() => { void loadView(); onChange(); }} />
           <section className={s.block} aria-labelledby="fills-h">
             <h2 id="fills-h" className={s.blockTitle}>Team trades in {pick?.symbol ?? "this token"}</h2>
             {!view?.trades.length ? (
@@ -169,71 +193,11 @@ export function Trade({ snap, onChange }: { snap: Snapshot; onChange: () => void
           </section>
         </div>
       </section>
+
+      <aside className={s.ticketCol} aria-label="Order">
+        <Ticket pick={pick} snap={snap} view={view} last={last} onDone={() => { void loadView(); onChange(); }} />
+      </aside>
     </div>
   );
 }
 
-function TradeBox({ pick, snap, pos, value, entry, onDone }: { pick: { token: string; symbol: string } | null; snap: Snapshot; pos: TokenView["position"]; value: number | null; entry: number | null; onDone: () => void }) {
-  const [side, setSide] = useState<"buy" | "sell">("buy");
-  const [amount, setAmount] = useState("0.01");
-  const [pct, setPct] = useState<number>(100);
-  const [msg, setMsg] = useState<{ text: string; hash?: string; bad?: boolean } | null>(null);
-  const pnl = pos && value !== null ? (value / pos.costEth - 1) * 100 : null;
-
-  useEffect(() => setMsg(null), [pick?.token]);
-
-  async function go() {
-    if (!pick) throw new Error("Pick a token first.");
-    setMsg(null);
-    try {
-      const r = await api.trade(side === "buy" ? { side, token: pick.token, symbol: pick.symbol, eth: amount } : { side, token: pick.token, symbol: pick.symbol, pct });
-      setMsg({ text: r.pending ? "Sent, waiting for the chain to confirm." : side === "buy" ? "Bought." : "Sold.", hash: r.hash });
-      onDone();
-    } catch (err) {
-      setMsg({ text: (err as Error).message, bad: true });
-      throw err;
-    }
-  }
-
-  return (
-    <section className={s.block} aria-labelledby="tb-h">
-      <h2 id="tb-h" className="sr-only">Trade {pick?.symbol}</h2>
-      {pos ? (
-        <div className={s.balances}>
-          <div><span className="faint">Position</span><strong className="num">{value !== null ? ethText(value) : "–"}</strong></div>
-          <div><span className="faint">Cost {entry ? `@ ${price(entry)}` : ""}</span><strong className={`num ${pnl === null ? "" : pnl >= 0 ? "up" : "down"}`}>{ethText(pos.costEth)}{pnl !== null ? ` ${pnl >= 0 ? "+" : ""}${pnl.toFixed(1)}%` : ""}</strong></div>
-        </div>
-      ) : null}
-      <div className={s.seg} role="group" aria-label="Side" style={{ marginBottom: 12 }}>
-        <button type="button" aria-pressed={side === "buy"} onClick={() => setSide("buy")}>Buy</button>
-        <button type="button" aria-pressed={side === "sell"} onClick={() => setSide("sell")}>Sell</button>
-      </div>
-      {side === "buy" ? (
-        <>
-          <label htmlFor="buy-eth" className="sr-only">ETH to spend</label>
-          <div className={s.amount}>
-            <input id="buy-eth" className="field num" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
-            <span className="faint">ETH</span>
-          </div>
-          <div className={s.presets}>
-            {BUYS.map((b) => <button key={b} type="button" className="chip" aria-pressed={amount === b} onClick={() => setAmount(b)}>{b}</button>)}
-          </div>
-        </>
-      ) : (
-        <div className={s.presets}>
-          {SELLS.map((p) => <button key={p} type="button" className="chip" aria-pressed={pct === p} onClick={() => setPct(p)}>{p === 100 ? "All" : `${p}%`}</button>)}
-        </div>
-      )}
-      <StatusButton className={`btn btn-primary ${s.go}`} onClick={go} successLabel={side === "buy" ? "Bought" : "Sold"}>
-        {side === "buy" ? `Buy ${pick?.symbol ?? ""}` : `Sell ${pct === 100 ? "all" : `${pct}%`}`}
-      </StatusButton>
-      <p className={s.note}>
-        {msg ? (
-          <span className={msg.bad ? "down" : undefined} role="status">{msg.text} {msg.hash ? <a href={txUrl(msg.hash)} target="_blank" rel="noopener">View</a> : null}</span>
-        ) : (
-          <span className="faint">From the team wallet ({snap.spendableEth === null ? "–" : ethText(Number(snap.spendableEth))} free), up to 3% slippage.</span>
-        )}
-      </p>
-    </section>
-  );
-}

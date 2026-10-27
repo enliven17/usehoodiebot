@@ -2,12 +2,19 @@ import type { Candidate } from "@/lib/chain/market";
 import type { Line } from "@/lib/lines";
 import type { Snapshot } from "@/lib/server/snapshot";
 
-import type { Candle, Fill } from "./Chart";
+import type { Fill } from "./Chart";
 
 export type { Line, Snapshot };
 export type Chat = { thread: number; title: string; at: number; open: boolean };
 export type MarketToken = Partial<Candidate> & { token: string; symbol: string; group: "held" | "traded" | "market" };
-export type TokenView = { market: (Candidate & { pool: string }) | null; candles: Candle[]; trades: Fill[]; position: { tokens: number; costEth: number } | null };
+export type TokenView = {
+  market: (Candidate & { pool: string }) | null;
+  trades: Fill[];
+  position: { tokens: number; costEth: number; takeProfitPct: number | null; stopLossPct: number | null; hand: boolean } | null;
+  held: number | null;
+};
+export type Quote = { in: number; out: number; spot: number | null };
+type Exits = { takeProfitPct?: string; stopLossPct?: string };
 
 async function call<T>(path: string, init?: RequestInit & { json?: unknown }): Promise<T> {
   const res = await fetch(path, {
@@ -28,8 +35,10 @@ export const api = {
   chats: () => call<{ threads: Chat[] }>("/api/chat/threads"),
   openChat: (thread: number) => call<{ lines: Line[] }>("/api/chat/open", { method: "POST", json: { thread } }),
   market: () => call<{ tokens: MarketToken[] }>("/api/market"),
-  token: (token: string, tf: string) => call<TokenView>(`/api/market/${token}?tf=${tf}`),
-  trade: (t: { side: "buy" | "sell"; token: string; symbol: string; eth?: string; pct?: number }) => call<{ hash: string; pending?: boolean }>("/api/trade", { method: "POST", json: t }),
+  token: (token: string) => call<TokenView>(`/api/market/${token}`),
+  quote: (q: { token: string; side: "buy" | "sell"; eth?: string; pct?: number }) => call<Quote>(`/api/quote?${new URLSearchParams(Object.entries(q).map(([k, v]) => [k, String(v)]))}`),
+  trade: (t: { side: "buy" | "sell"; token: string; symbol: string; slippageBps: number; eth?: string; pct?: number } & Exits) => call<{ hash: string; pending?: boolean }>("/api/trade", { method: "POST", json: t }),
+  exits: (e: { token: string } & Exits) => call<{ ok: true }>("/api/exits", { method: "POST", json: e }),
   newChat: () => call<{ lines: Line[] }>("/api/chat/new", { method: "POST" }),
   decide: (id: string, approve: boolean) => call<{ status: string; result: { hash?: string; error?: string } | null }>(`/api/approvals/${id}`, { method: "POST", json: { approve } }),
   strategy: (id: string, patch: { active?: boolean; mode?: "ask" | "auto" }) => call(`/api/strategies/${id}`, { method: "PATCH", json: patch }),

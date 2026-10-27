@@ -20,6 +20,8 @@ export type Venue = "curve" | "graduated";
 export type Candidate = {
   token: `0x${string}`;
   symbol: string;
+  /** The pool GeckoTerminal tracks it in: what the chart asks for candles. */
+  pool?: string;
   venue: Venue;
   priceEth: number | null;
   liquidityUsd?: number;
@@ -60,6 +62,7 @@ export function toCandidate(p: Pool, venue: Venue, now: number): Candidate | nul
   const ethUsd = num(a.quote_token_price_usd);
   return {
     token: getAddress(raw),
+    pool: a.address,
     symbol: (a.name ?? "").split(" / ")[0]?.trim() || raw.slice(0, 6),
     venue,
     priceEth: num(a.base_token_price_native_currency) ?? null,
@@ -77,17 +80,32 @@ export function toCandidate(p: Pool, venue: Venue, now: number): Candidate | nul
   };
 }
 
-// ponytail: per-instance memory cache; a shared cache (KV) only if serverless cold starts start hitting the rate limit.
-const cache = new Map<string, { at: number; data: Promise<unknown> }>();
+/**
+ * GeckoTerminal answers 429 after a few calls a minute from one address. Each answer is kept, and a refused call falls
+ * back to the last good answer, so a busy minute shows slightly old data instead of nothing.
+ * ponytail: per-instance memory cache; a shared cache (KV) only if serverless cold starts start hitting the rate limit.
+ */
+const cache = new Map<string, { at: number; data: Promise<unknown>; good?: unknown }>();
 function gt<T>(url: string, ttl = TTL_MS): Promise<T> {
   const hit = cache.get(url);
   if (hit && Date.now() - hit.at < ttl) return hit.data as Promise<T>;
-  const data = fetch(url, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(15_000) }).then(async (r) => {
-    if (!r.ok) throw new Error(`geckoterminal ${r.status}`);
-    return (await r.json()) as T;
-  });
-  data.catch(() => cache.delete(url));
-  cache.set(url, { at: Date.now(), data });
+  const data = fetch(url, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(15_000) })
+    .then(async (r) => {
+      if (!r.ok) throw new Error(`geckoterminal ${r.status}`);
+      const json = (await r.json()) as T;
+      cache.set(url, { at: Date.now(), data: Promise.resolve(json), good: json });
+      return json;
+    })
+    .catch((err) => {
+      const good = cache.get(url)?.good;
+      if (good !== undefined) {
+        cache.set(url, { at: Date.now() - ttl + 10_000, data: Promise.resolve(good), good }); // try again in 10 s
+        return good as T;
+      }
+      cache.delete(url);
+      throw err;
+    });
+  cache.set(url, { at: Date.now(), data, good: hit?.good });
   return data;
 }
 const pools = (url: string) => gt<{ data?: Pool[] }>(url).then((j) => j.data ?? []);
@@ -116,7 +134,8 @@ export type Candle = { time: number; open: number; high: number; low: number; cl
 
 /** A token's busiest pool (curve or graduated) with its market numbers. */
 export async function tokenMarket(token: string): Promise<(Candidate & { pool: string }) | null> {
-  const list = await pools(`${GT}/tokens/${token.toLowerCase()}/pools?page=1`);
+  // a token's pool only changes when it graduates: an hour is fresh enough for the lookup
+  const list = (await gt<{ data?: Pool[] }>(`${GT}/tokens/${token.toLowerCase()}/pools?page=1`, 60 * 60_000)).data ?? [];
   const p = list.find((x) => x.relationships?.dex?.data?.id?.startsWith("pons-v2")) ?? list[0];
   const pool = p?.attributes?.address;
   if (!p || !pool) return null;
@@ -124,7 +143,7 @@ export async function tokenMarket(token: string): Promise<(Candidate & { pool: s
   return c && { ...c, pool };
 }
 
-/** Candles in ETH (GeckoTerminal's price in the quote token), oldest first. */
+/** Candles in ETH (GeckoTerminal's price in the quote token), oldest first. Also runs in the browser (GT allows CORS). */
 export async function candles(pool: string, tf: Timeframe): Promise<Candle[]> {
   const [unit, aggregate] = TIMEFRAMES[tf];
   const j = await gt<{ data?: { attributes?: { ohlcv_list?: number[][] } } }>(`${GT}/pools/${pool.toLowerCase()}/ohlcv/${unit}?aggregate=${aggregate}&limit=300&currency=token`, 30_000);
