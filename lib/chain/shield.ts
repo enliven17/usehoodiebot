@@ -6,6 +6,8 @@
  * developer_address, developer_holding_percentage, is_honeypot, gt_score, twitter_handle, telegram_handle, websites;
  * /pools/{p}/trades → data[].attributes {kind, tx_from_address, from_token_amount, to_token_amount, block_timestamp}.
  */
+import { gt } from "./market";
+
 export type TokenInfo = {
   holders?: { count?: number; distribution_percentage?: { top_10?: string } };
   developer_address?: string | null;
@@ -93,11 +95,8 @@ const TTL_MS = 3 * 60_000;
 const memo = new Map<string, { at: number; data: Promise<Shield> }>();
 
 type RawTrade = { attributes?: { kind?: string; tx_from_address?: string; from_token_amount?: string; to_token_amount?: string; block_timestamp?: string } };
-const get = <T>(url: string) =>
-  fetch(url, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(12_000) }).then(async (r) => {
-    if (!r.ok) throw new Error(`geckoterminal ${r.status}`);
-    return (await r.json()) as T;
-  });
+// the shared GeckoTerminal fetch: cached, retried on a 429, and falling back to the last good answer
+const get = <T>(url: string) => gt<T>(url, TTL_MS);
 
 /** ShieldBot's read on a token, from GeckoTerminal; cached a few minutes per token. */
 export function shield(token: string, pool: string | undefined): Promise<Shield> {

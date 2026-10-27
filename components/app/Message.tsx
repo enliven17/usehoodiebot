@@ -8,10 +8,11 @@ import { TEAM, type Member } from "@/lib/team";
 
 import type { Line } from "./api";
 import s from "./app.module.css";
+import { TradeCard } from "./TradeCard";
 
 const STEP_LABEL: Record<string, string> = {
   scan_market: "scanned the market", research_token: "read the token", get_wallet: "checked the wallet", propose_trade: "prepared a trade",
-  check_safety: "checked the safety", create_strategy: "saved a strategy", list_strategies: "read your strategies", update_strategy: "updated a strategy", prepare_launch: "checked the launch",
+  check_safety: "checked the safety", find_token: "looked the token up", offer_trade: "laid out the trade", create_strategy: "saved a strategy", list_strategies: "read your strategies", update_strategy: "updated a strategy", prepare_launch: "checked the launch",
 };
 
 const Spans = ({ spans }: { spans: Span[] }) => (
@@ -33,7 +34,7 @@ export function Rich({ text }: { text: string }) {
 }
 
 /** One line of the conversation; it rises in softly the first time it renders. */
-export function Message({ line }: { line: Line }) {
+export function Message({ line, onTraded }: { line: Line; onTraded?: () => void }) {
   const reduce = useReducedMotion();
   const enter = reduce ? {} : { initial: { opacity: 0, y: 10, filter: "blur(4px)" }, animate: { opacity: 1, y: 0, filter: "blur(0px)" }, transition: { duration: 0.35, ease: [0.2, 0.7, 0.2, 1] as const } };
   if (line.who === "me") {
@@ -59,6 +60,7 @@ export function Message({ line }: { line: Line }) {
           </p>
         ) : null}
         <Rich text={line.text} />
+        {line.cards?.map((c) => <TradeCard key={c.id} card={c} onDone={() => onTraded?.()} />)}
       </div>
     </motion.div>
   );

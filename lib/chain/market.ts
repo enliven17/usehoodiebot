@@ -65,7 +65,7 @@ export function toCandidate(p: Pool, venue: Venue, now: number): Candidate | nul
   return {
     token: getAddress(raw),
     pool: a.address,
-    quote: (a.name ?? "").split(" / ")[1]?.trim(),
+    quote: (a.name ?? "").split(" / ")[1]?.trim().split(" ")[0],
     symbol: (a.name ?? "").split(" / ")[0]?.trim() || raw.slice(0, 6),
     venue,
     priceEth: num(a.base_token_price_native_currency) ?? null,
@@ -89,10 +89,20 @@ export function toCandidate(p: Pool, venue: Venue, now: number): Candidate | nul
  * ponytail: per-instance memory cache; a shared cache (KV) only if serverless cold starts start hitting the rate limit.
  */
 const cache = new Map<string, { at: number; data: Promise<unknown>; good?: unknown }>();
-function gt<T>(url: string, ttl = TTL_MS): Promise<T> {
+/** One GeckoTerminal GET; a 429 is tried once more after a short wait (its limit is per minute and refills). */
+async function fetchGt(url: string, retry = true): Promise<Response> {
+  const r = await fetch(url, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(15_000) });
+  if (r.status === 429 && retry) {
+    await new Promise((ok) => setTimeout(ok, 1500));
+    return fetchGt(url, false);
+  }
+  return r;
+}
+
+export function gt<T>(url: string, ttl = TTL_MS): Promise<T> {
   const hit = cache.get(url);
   if (hit && Date.now() - hit.at < ttl) return hit.data as Promise<T>;
-  const data = fetch(url, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(15_000) })
+  const data = fetchGt(url)
     .then(async (r) => {
       if (!r.ok) throw new Error(`geckoterminal ${r.status}`);
       const json = (await r.json()) as T;
@@ -154,4 +164,14 @@ export async function candles(pool: string, tf: Timeframe): Promise<Candle[]> {
     .map(([time, open, high, low, close, volume]) => ({ time: time!, open: open!, high: high!, low: low!, close: close!, volume: volume ?? 0 }))
     .filter((c) => [c.time, c.open, c.high, c.low, c.close].every(Number.isFinite))
     .reverse();
+}
+
+/** Pons tokens priced in ETH whose name or symbol matches `q`, busiest pool first, one row per token. */
+export async function searchTokens(q: string): Promise<Candidate[]> {
+  const list = await pools(`${GT}/search/pools?query=${encodeURIComponent(q.slice(0, 40))}&network=robinhood`);
+  const seen = new Set<string>();
+  return list
+    .filter((p) => p.relationships?.dex?.data?.id?.startsWith("pons-v2") || p.relationships?.dex?.data?.id === "uniswap-v4-robinhood")
+    .map((p) => toCandidate(p, p.relationships?.dex?.data?.id === "pons-v2" ? "curve" : "graduated", Date.now()))
+    .filter((c): c is Candidate => c !== null && (c.quote === "WETH" || c.quote === "ETH") && !seen.has(c.token) && !!seen.add(c.token));
 }

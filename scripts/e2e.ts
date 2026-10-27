@@ -82,6 +82,29 @@ const verdict = asked.lines.at(-1)!;
 console.log("    steps", verdict.steps.map((x) => `${x.member}:${x.tool}`).join(", "));
 console.log("    reply", verdict.text.slice(0, 400).replaceAll("\n", " "));
 if (!verdict.steps.some((x) => x.tool === "check_safety")) throw new Error("ShieldBot was not asked before a buy");
+// chat trading: name a token, get a card with its ticker, confirm it (refused for lack of ETH; the card stays usable)
+const bought = (await step(`chat: buy ${pick.symbol}`, () => call("/api/chat", { method: "POST", json: { text: `buy 0.002 eth of ${pick.symbol}` } }))) as { lines: Array<{ text: string; steps: Array<{ tool: string }>; cards?: Array<{ id: string; side: string; token: string; symbol: string; ethAmount: number; safety: { score: number; blocked: boolean } | null }> }> };
+const said = bought.lines.at(-1)!;
+console.log("    steps", said.steps.map((x) => x.tool).join(", "), "· reply", said.text.slice(0, 160).replaceAll("\n", " "));
+const card = said.cards?.[0];
+if (card) {
+  console.log("    card", card.side, card.symbol, card.ethAmount, "ETH · shield", card.safety?.score, card.safety?.blocked ? "blocked" : "");
+  if (!card.safety?.blocked) {
+    for (let k = 0; k < 2; k++) {
+      const r = await call("/api/trade", { method: "POST", json: { side: card.side, token: card.token, symbol: card.symbol, eth: String(card.ethAmount), slippageBps: 300, cardId: card.id } }).catch((e: Error) => e.message);
+      if (typeof r !== "string" || !/ETH to trade/.test(r)) throw new Error(`card press ${k + 1}: ${JSON.stringify(r)}`);
+    }
+    console.log("ok  card refused twice for lack of ETH, never marked done");
+  }
+} else console.log("    no card: the agent asked first (several matches or no amount)");
+
+const preset = (await step("chat: preset", () => call("/api/chat", { method: "POST", json: { text: "Set me up with the Launch Sniper preset, just save it." } }))) as { lines: Array<{ steps: Array<{ tool: string }> }> };
+console.log("    steps", preset.lines.at(-1)!.steps.map((x) => x.tool).join(", "));
+const after = (await call("/api/team")) as { strategies: Array<{ name: string; rules: string[][] }> };
+const sniper = after.strategies.find((x) => x.rules.some((r) => r[0] === "Safety" && r[1]!.startsWith("70")));
+if (!sniper) throw new Error("the Launch Sniper preset was not saved with its rules");
+console.log("ok  preset saved:", sniper.name);
+
 const view = (await step(`token ${pick.symbol}`, () => call(`/api/market/${pick.token}`))) as { market: { pool: string } | null; held: number | null };
 console.log("    pool", view.market?.pool, "held", view.held);
 const q = (await step("quote 0.001 ETH", () => call(`/api/quote?token=${pick.token}&side=buy&eth=0.001`))) as { in: number; out: number; spot: number | null };

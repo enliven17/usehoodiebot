@@ -226,7 +226,7 @@ export function App({ signedIn }: { signedIn: boolean }) {
               </ul>
             </motion.div>
           ) : (
-            lines.map((l) => <Message key={l.id} line={l} />)
+            lines.map((l) => <Message key={l.id} line={l} onTraded={refresh} />)
           )}
           <AnimatePresence>
             {thinking ? (

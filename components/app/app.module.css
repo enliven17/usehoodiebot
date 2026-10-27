@@ -384,3 +384,40 @@
   .enterHint { display: none }
   .ask { min-height: 0 }
 }
+
+/* a trade the owner asked for in chat */
+.tradeCard { margin-top: 10px; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--border); background: rgba(255, 255, 255, .03) }
+.tradeCard[data-side="buy"] { border-color: rgba(159, 232, 181, .28) }
+.tradeCard[data-side="sell"] { border-color: rgba(252, 165, 165, .28) }
+.tcHead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; font-size: 12.5px }
+.tcHead a { text-decoration: none }
+.tcSide { padding: 1px 7px; border-radius: 6px; font-family: var(--font-mono); font-size: 11.5px }
+.tradeCard[data-side="buy"] .tcSide { color: var(--green-300); background: rgba(159, 232, 181, .12) }
+.tradeCard[data-side="sell"] .tcSide { color: var(--red-300); background: rgba(252, 165, 165, .12) }
+.tcSym { font-size: 17px; font-weight: 500; color: var(--text) }
+.tcFacts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; margin: 10px 0 }
+.tcFacts div { display: flex; flex-direction: column; gap: 1px }
+.tcFacts dt { font-size: 11.5px; color: var(--text-faint) }
+.tcFacts dd { margin: 0; font-size: 13.5px; color: var(--text) }
+.tcSafety { margin: 0 0 10px; padding-left: 9px; border-left: 2px solid #8ab4ff; font-size: 12.5px; line-height: 1.45; color: var(--text-2) }
+.tcSafety[data-blocked] { border-left-color: var(--red-300) }
+.tcSafety .num { color: var(--text) }
+.tcActions { display: flex; flex-direction: column; gap: 6px }
+.tcActions .go { height: 42px }
+.tcActions .go:disabled { background: rgba(255, 255, 255, .06); color: var(--text-muted) }
+.tcActions span { font-size: 11.5px }
+.tcDone { margin: 0; font-size: 13.5px }
+.tcDone a { color: var(--text-2) }
+.presetsGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 0 0 14px; padding: 0; list-style: none }
+.presetCard { display: flex; flex-direction: column; gap: 6px; padding: 14px; border-radius: 14px; border: 1px solid var(--border); background: rgba(255, 255, 255, .02); transition: border-color .2s var(--ease) }
+.presetCard:hover { border-color: var(--border-strong) }
+.presetCard :global(.btn) { align-self: flex-start; height: 32px; margin-top: auto; font-size: 13px }
+.presetHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0; font-size: 14.5px }
+.presetHead strong { font-weight: 500; color: var(--text) }
+.risk { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted) }
+.risk[data-risk="high"] { color: var(--red-300) }
+.risk[data-risk="low"] { color: var(--green-300) }
+.presetPitch { margin: 0; font-size: 13px; line-height: 1.5; color: var(--text-2) }
+.presetRules { margin: 0 0 4px; font-size: 11.5px; color: var(--text-muted) }
+@media (max-width: 65rem) { .presetsGrid { grid-template-columns: repeat(2, minmax(0, 1fr)) } }
+@media (max-width: 48rem) { .presetsGrid { grid-template-columns: minmax(0, 1fr) } }

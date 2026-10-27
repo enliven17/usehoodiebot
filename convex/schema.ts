@@ -115,6 +115,9 @@ export default defineSchema({
     hash: v.optional(v.string()),
   }).index("by_status", ["status"]),
 
+  /** A trade card from the chat that the owner confirmed: one fill per card. */
+  chatTrades: defineTable({ owner: v.string(), cardId: v.string(), hash: v.string() }).index("by_owner", ["owner", "cardId"]),
+
   trades: defineTable({
     owner: v.string(),
     side: v.union(v.literal("buy"), v.literal("sell")),

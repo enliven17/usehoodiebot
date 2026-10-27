@@ -1,3 +1,4 @@
+import { api, query } from "@/lib/db";
 import { toLines } from "@/lib/lines";
 import { chat, thread } from "@/lib/server/brain";
 import { errorText, fail, requireTeam } from "@/lib/server/http";
@@ -8,7 +9,7 @@ export const maxDuration = 300;
 export async function GET() {
   const team = await requireTeam();
   if (team instanceof Response) return team;
-  return Response.json({ lines: toLines(await thread(team), TOOL_MEMBER) });
+  return Response.json({ lines: toLines(await thread(team), TOOL_MEMBER, await query(api.chatTrades.done, { owner: team.owner })) });
 }
 
 export async function POST(req: Request) {
@@ -19,7 +20,7 @@ export async function POST(req: Request) {
   if (!text) return fail(400, "Say something first.");
   try {
     await chat(team, text);
-    return Response.json({ lines: toLines(await thread(team), TOOL_MEMBER) });
+    return Response.json({ lines: toLines(await thread(team), TOOL_MEMBER, await query(api.chatTrades.done, { owner: team.owner })) });
   } catch (err) {
     return fail(502, errorText(err));
   }

@@ -3,7 +3,10 @@ import "server-only";
 import { formatEther, parseEther } from "viem";
 
 import { addressUrl } from "../chain/robinhood";
-import { candidates, tokenMarket, type Candidate } from "../chain/market";
+import { candidates, searchTokens, tokenMarket, type Candidate } from "../chain/market";
+import { CARD_TOOL, type TradeCard } from "../lines";
+import { PRESETS, presetById } from "../presets";
+import { afterFee } from "./fees";
 import { shield } from "../chain/shield";
 import { FACTORY_ABI, PONS_FACTORY } from "../chain/pons";
 import { publicClient } from "../chain/robinhood";
@@ -69,6 +72,51 @@ export const TOOLS: Tool[] = [
     },
   },
   {
+    name: "find_token", member: "research",
+    description: "Find Pons tokens by symbol, name or address when the owner names one (\"buy some PEPE\"). Returns up to 5 tradable matches, busiest first, with address, market cap, liquidity and age, so you can say which one you mean.",
+    input_schema: obj({ query: { type: "string", description: "symbol, name, or 0x address" } }, ["query"]),
+    async run(_t, i) {
+      const q = String(i.query ?? "").trim().replace(/^\$/, "");
+      if (!q) return { error: "Say which token." };
+      const address = normalizeToken(q);
+      const found = address ? [await tokenMarket(address).catch(() => null)].filter((c): c is NonNullable<typeof c> => !!c) : await searchTokens(q).catch(() => []);
+      const listed = (await candidates().catch(() => [])).filter((c) => c.symbol.toLowerCase() === q.toLowerCase());
+      const all = [...listed, ...found].filter((c, k, a) => a.findIndex((x) => x.token === c.token) === k);
+      const tradable = await getExecutor().onlyTradable(all.slice(0, 8)).catch(() => all);
+      return tradable.slice(0, 5).map(brief);
+    },
+  },
+  {
+    name: CARD_TOOL, member: "trader",
+    description: "When the owner asks in chat to buy or sell a specific token, lay the trade out as a card in the chat: ticker, price, market cap, ShieldBot score and what they get. Nothing trades until they press Buy or Sell on the card. Use it for every direct buy or sell request; ask which token first if find_token returns more than one plausible match.",
+    input_schema: obj({ side: { type: "string", enum: ["buy", "sell"] }, token: { type: "string" }, symbol: { type: "string" }, ethAmount: { type: "number", description: "buy: ETH to spend" }, pct: { type: "number", description: "sell: share of the holding, 1-100, default 100" } }, ["side", "token", "symbol"]),
+    async run(team, i) {
+      const token = normalizeToken(i.token);
+      const ex = getExecutor();
+      if (!token || !(await ex.onlyTradable([{ token }])).length) return { error: "Not a tradable Pons token priced in ETH." };
+      const side = i.side === "sell" ? "sell" : "buy";
+      const eth = Number(i.ethAmount);
+      if (side === "buy" && !(eth >= SPEC_LIMITS.sizeEth[0] && eth <= SPEC_LIMITS.sizeEth[1])) return { error: `Buy size must be ${SPEC_LIMITS.sizeEth[0]}–${SPEC_LIMITS.sizeEth[1]} ETH. Ask how much.` };
+      const pct = side === "sell" ? Math.min(100, Math.max(1, Number(i.pct) || 100)) : null;
+      const [market, held, safety] = await Promise.all([
+        tokenMarket(token).catch(() => null),
+        ex.tokenBalance(team.wallet, token).catch(() => 0n),
+        side === "buy" ? safetyOf(token).catch(() => null) : Promise.resolve(null),
+      ]);
+      if (side === "sell" && held === 0n) return { error: "The team wallet holds none of it." };
+      const amount = side === "buy" ? afterFee(parseEther(String(eth))) : (held * BigInt(Math.round(pct! * 100))) / 10_000n;
+      const out = await ex.quote(token, side, amount).then((o) => Number(side === "buy" ? o : afterFee(o)) / 1e18).catch(() => null);
+      const card: Omit<TradeCard, "id"> = {
+        side, token, symbol: market?.symbol ?? String(i.symbol).slice(0, 24), venue: market?.venue ?? null,
+        ethAmount: side === "buy" ? eth : null, pct, priceEth: market?.priceEth ?? null, mcapUsd: market?.mcapUsd ?? null, out,
+        held: Number(held) / 1e18,
+        safety: safety ? { score: safety.score, blocked: safety.blocks.length > 0, note: safety.blocks[0] ?? safety.warns[0] ?? "Nothing flagged." } : side === "buy" ? { score: -1, blocked: false, note: "ShieldBot could not check it just now; you are buying it unchecked." } : null,
+        at: Date.now(),
+      };
+      return { card, shown: "The owner sees a card with a confirm button; tell them to check it and press it. Do not say it traded." };
+    },
+  },
+  {
     name: "check_safety", member: "shield",
     description: "ShieldBot's safety read on one token before any buy: honeypot flag, how much the creator still holds and whether they sold, holder count and top-10 share, whether one buyer is split across wallets (same odd buy size), how concentrated the recent buying is, and socials. Returns blocks (never buy), warnings, and a 0-100 score.",
     input_schema: obj({ token: { type: "string", description: "0x token address" } }, ["token"]),
@@ -118,9 +166,9 @@ export const TOOLS: Tool[] = [
   {
     name: "create_strategy", member: "sniper",
     description: "Save a Strategy SniperBot checks every minute. Every match is put up for the owner's approval. Only the owner can make a strategy trade automatically: in the Team tab, with Autopilot on and a budget.",
-    input_schema: obj({ name: { type: "string" }, spec: SPEC_SCHEMA }, ["name", "spec"]),
+    input_schema: obj({ name: { type: "string" }, preset: { type: "string", enum: PRESETS.map((p) => p.id), description: `start from a ready-made strategy: ${PRESETS.map((p) => `${p.id} (${p.name}: ${p.pitch})`).join("; ")}. Fields in spec override it.` }, spec: { ...SPEC_SCHEMA, required: [] } }, ["name"]),
     async run(team, i) {
-      const spec = parseSpec(i.spec);
+      const spec = parseSpec({ ...(presetById(i.preset)?.spec ?? { watch: "new", sizeEth: 0.01 }), ...((i.spec as object) ?? {}) });
       // Always "ask": tool input can be steered by token names in market data, so the model never turns on automatic trading.
       const id = await mutate(api.strategies.create, { owner: team.owner, name: String(i.name).slice(0, 60), spec, mode: "ask", limit: 5 });
       if (!id) return { error: "Five strategies are already running. Pause one first." };

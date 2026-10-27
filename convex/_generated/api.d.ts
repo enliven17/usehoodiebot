@@ -13,6 +13,7 @@ import type * as applications from "../applications.js";
 import type * as approvals from "../approvals.js";
 import type * as book from "../book.js";
 import type * as chat from "../chat.js";
+import type * as chatTrades from "../chatTrades.js";
 import type * as crons from "../crons.js";
 import type * as events from "../events.js";
 import type * as fees from "../fees.js";
@@ -32,6 +33,7 @@ declare const fullApi: ApiFromModules<{
   approvals: typeof approvals;
   book: typeof book;
   chat: typeof chat;
+  chatTrades: typeof chatTrades;
   crons: typeof crons;
   events: typeof events;
   fees: typeof fees;
