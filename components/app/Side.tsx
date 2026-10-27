@@ -176,6 +176,7 @@ export function Strategies({ snap, onChange }: { snap: Snapshot; onChange: () =>
               </button>
             ))}
           </div>
+          {st.mode === "auto" && !snap.autopilot.on ? <p className="faint" style={{ margin: "6px 0 0", fontSize: 12.5 }}>Asks first until Autopilot is on, in the Team tab.</p> : null}
         </div>
       ))}
     </section>

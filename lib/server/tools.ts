@@ -117,14 +117,14 @@ export const TOOLS: Tool[] = [
   },
   {
     name: "create_strategy", member: "sniper",
-    description: "Save a Strategy SniperBot checks every minute. Every match is put up for the owner's approval. Only the owner can switch a strategy to automatic trading, from the Strategies panel.",
+    description: "Save a Strategy SniperBot checks every minute. Every match is put up for the owner's approval. Only the owner can make a strategy trade automatically: in the Team tab, with Autopilot on and a budget.",
     input_schema: obj({ name: { type: "string" }, spec: SPEC_SCHEMA }, ["name", "spec"]),
     async run(team, i) {
       const spec = parseSpec(i.spec);
       // Always "ask": tool input can be steered by token names in market data, so the model never turns on automatic trading.
       const id = await mutate(api.strategies.create, { owner: team.owner, name: String(i.name).slice(0, 60), spec, mode: "ask", limit: 5 });
       if (!id) return { error: "Five strategies are already running. Pause one first." };
-      return { id, watching: WATCH_LABEL[spec.watch], rules: describe(spec), mode: "asks before each trade; the owner can switch it to automatic in the Strategies panel" };
+      return { id, watching: WATCH_LABEL[spec.watch], rules: describe(spec), mode: "asks before each trade; the owner can make it automatic in the Team tab under Autopilot" };
     },
   },
   {
@@ -138,7 +138,7 @@ export const TOOLS: Tool[] = [
   },
   {
     name: "update_strategy", member: "sniper",
-    description: "Pause or resume a strategy. Switching to automatic trading is only possible for the owner, in the Strategies panel.",
+    description: "Pause or resume a strategy. Automatic trading is only for the owner to switch on, in the Team tab under Autopilot.",
     input_schema: obj({ id: { type: "string" }, active: { type: "boolean" } }, ["id", "active"]),
     async run(team, i) {
       const ok = await mutate(api.strategies.update, { owner: team.owner, id: String(i.id), ...(typeof i.active === "boolean" ? { active: i.active } : {}) });

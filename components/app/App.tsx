@@ -11,6 +11,7 @@ import { Mark } from "@/components/Logo";
 import { ShimmeringText } from "@/components/ui/ShimmeringText";
 
 import { api, type Access, type Line, type Snapshot, type TokenGate } from "./api";
+import { Agents } from "./Agents";
 import { Apply } from "./Apply";
 import s from "./app.module.css";
 import { History } from "./History";
@@ -31,8 +32,8 @@ const STARTERS = [
   ["launch", "What do I need to launch a token on Pons?"],
 ] as const;
 
-type Panel = "chat" | "history" | "trade" | "team";
-const TITLES: Record<Panel, string> = { chat: "Chat", history: "Chats", trade: "Trade", team: "Wallet" };
+type Panel = "chat" | "history" | "agents" | "trade" | "team";
+const TITLES: Record<Panel, string> = { chat: "Chat", history: "Chats", agents: "Team", trade: "Trade", team: "Wallet" };
 
 export function App({ signedIn }: { signedIn: boolean }) {
   const params = useSearchParams();
@@ -181,6 +182,10 @@ export function App({ signedIn }: { signedIn: boolean }) {
           <svg className="i" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /><path d="M12 7v5l4 2" /></svg>
           <span className={s.railLabel}>Chats</span>
         </button>
+        <button type="button" className={s.railBtn} aria-current={panel === "agents" ? "page" : undefined} onClick={() => setPanel("agents")} aria-label="Team and Autopilot">
+          <svg className="i" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+          <span className={s.railLabel}>Team</span>
+        </button>
         <button type="button" className={s.railBtn} aria-current={panel === "trade" ? "page" : undefined} onClick={() => setPanel("trade")} aria-label="Trade">
           <svg className="i" viewBox="0 0 24 24"><path d="M3 3v16a2 2 0 0 0 2 2h16" /><path d="m19 9-5 5-4-4-3 3" /></svg>
           <span className={s.railLabel}>Trade</span>
@@ -200,8 +205,9 @@ export function App({ signedIn }: { signedIn: boolean }) {
         </button>
       </nav>
 
-      <main className={s.main} data-view={panel === "trade" || panel === "history" ? panel : "chat"}>
+      <main className={s.main} data-view={panel === "trade" || panel === "history" || panel === "agents" ? panel : "chat"}>
         {panel === "trade" && snap ? <Trade snap={snap} onChange={refresh} /> : null}
+        {panel === "agents" && snap ? <Agents snap={snap} onChange={refresh} /> : null}
         {panel === "history" ? (
           <History
             onNew={() => api.newChat().then((r) => { setLines(r.lines); setPanel("chat"); })}

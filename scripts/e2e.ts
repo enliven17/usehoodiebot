@@ -55,6 +55,19 @@ console.log("    reply", reply.text.slice(0, 300).replace(/\n/g, " "));
 const snap = (await step("snapshot", () => call("/api/team"))) as { events: Array<{ member: string; text: string }> };
 console.log("    events", snap.events.map((e) => `${e.member}: ${e.text}`).slice(0, 4));
 
+// Autopilot: no budget, no Autopilot; with one it turns on; a strategy built in the app can be automatic from the start
+const noBudget = await call("/api/autopilot", { method: "POST", json: { on: true, budgetEth: 0 } }).catch((e: Error) => e.message);
+if (typeof noBudget !== "string" || !/budget/.test(noBudget)) throw new Error("Autopilot turned on without a budget");
+await step("autopilot on", () => call("/api/autopilot", { method: "POST", json: { on: true, budgetEth: 0.05 } }));
+const built = (await step("build an automatic strategy", () => call("/api/strategies", { method: "POST", json: { name: "E2E auto", mode: "auto", spec: { watch: "new", sizeEth: 0.001, minSafetyScore: 70, trailingStopPct: 20 } } }))) as { id: string };
+const withAuto = (await call("/api/team")) as { autopilot: { on: boolean; budgetEth: number }; strategies: Array<{ id: string; mode: string; rules: string[][] }>; agents: Record<string, unknown> };
+const mine = withAuto.strategies.find((x) => x.id === built.id);
+if (!withAuto.autopilot.on || mine?.mode !== "auto" || !mine.rules.some((r) => r[0] === "Trailing stop")) throw new Error("Autopilot or the built strategy did not stick");
+if (Object.keys(withAuto.agents).length !== 6) throw new Error("the snapshot should carry all six specialists");
+console.log("ok  autopilot on, budget", withAuto.autopilot.budgetEth, "· rules", mine.rules.map((r) => r[0]).join(", "));
+await call(`/api/strategies/${built.id}`, { method: "DELETE" });
+await call("/api/autopilot", { method: "POST", json: { on: false, budgetEth: 0.05 } });
+
 // past chats: start a new one, the first shows up in the list and reopens with its lines
 const first = (await step("new chat", () => call("/api/chat/new", { method: "POST" })).then(() => call("/api/chat/threads"))) as { threads: Array<{ thread: number; title: string }> };
 console.log("    chats", first.threads.map((t) => `${t.thread}: ${t.title.slice(0, 40)}`));

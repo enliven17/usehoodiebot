@@ -95,7 +95,53 @@
 
 /* views inside main */
 .main[data-view="trade"] > .thread, .main[data-view="trade"] > .composer, .main[data-view="history"] > .thread, .main[data-view="history"] > .composer { display: none }
-.main[data-view="trade"], .main[data-view="history"] { background: rgba(4, 6, 10, .94) }
+.main[data-view="trade"], .main[data-view="history"], .main[data-view="agents"] { background: rgba(4, 6, 10, .94) }
+.main[data-view="agents"] > .thread, .main[data-view="agents"] > .composer { display: none }
+
+/* team: autopilot, the specialists at work, strategies */
+.agentsPage { flex: 1; overflow-y: auto; padding: 28px max(20px, calc((100% - 880px) / 2)) 40px; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, .14) transparent }
+.agentsPage > .pageTitle { margin-bottom: 18px }
+.autopilot { padding: 18px 20px; border-radius: var(--radius); border: 1px solid var(--border); background: rgba(255, 255, 255, .02); transition: border-color .3s var(--ease) }
+.autopilot[data-on] { border-color: rgba(159, 232, 181, .35) }
+.apHead { display: flex; align-items: center; gap: 10px }
+.apHead h2 { margin: 0; font-size: 16px; font-weight: 500 }
+.apState { padding: 2px 9px; border-radius: 7px; font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); background: rgba(255, 255, 255, .06) }
+.autopilot[data-on] .apState { color: var(--green-300); background: rgba(159, 232, 181, .12) }
+.apText { margin: 8px 0 14px; font-size: 14px; line-height: 1.55; color: var(--text-2) }
+.apRow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px }
+.apRow .exitField { width: 140px }
+.apRow :global(.btn) { height: 36px }
+.apMeter { margin-bottom: 14px }
+.apMeter > span { display: block; height: 4px; border-radius: 2px; background: var(--green-300); max-width: 100%; transition: width .4s var(--ease); box-shadow: 0 0 0 1px rgba(255, 255, 255, .02) }
+.apMeter { background: linear-gradient(rgba(255, 255, 255, .08), rgba(255, 255, 255, .08)) 0 0 / 100% 4px no-repeat }
+.apMeter p { margin: 6px 0 0; font-size: 12.5px }
+.apConfirm { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border) }
+.apConfirm p { margin: 0 0 12px; font-size: 14px; line-height: 1.55; color: var(--text-2) }
+.agents { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 28px; margin: 22px 0 6px; padding: 0; list-style: none }
+.agent { display: flex; gap: 12px; padding: 16px 0; border-top: 1px solid var(--border) }
+.agentBody { min-width: 0; flex: 1 }
+.agentHead { display: flex; justify-content: space-between; gap: 8px; margin: 0; font-size: 14px }
+.agentHead strong { font-weight: 500; color: var(--text) }
+.agentHead time { font-size: 11.5px }
+.agentJob { margin: 2px 0 6px; font-size: 12.5px; color: var(--text-faint) }
+.agentLast { display: -webkit-box; margin: 0; padding-left: 9px; border-left: 2px solid var(--eye); font-size: 13.5px; line-height: 1.45; color: var(--text-2); overflow: hidden; -webkit-line-clamp: 2; -webkit-box-orient: vertical }
+.agentCounts { margin: 6px 0 0; font-size: 11.5px; color: var(--text-muted) }
+.agentsSection { padding-top: 14px; border-top: 1px solid var(--border) }
+.agentsSection .strategy { margin: 0 }
+.agentsSection > .block { border-bottom: 0; padding-bottom: 8px }
+.newStrategy { margin-bottom: 14px }
+.builder { display: flex; flex-direction: column; gap: 14px; margin-bottom: 18px; padding: 16px; border-radius: var(--radius); border: 1px solid var(--border); background: rgba(255, 255, 255, .02) }
+.builder .question { display: flex; flex-direction: column; gap: 6px }
+.builder .presets { margin: 0 }
+.builderGroup { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin: 0; padding: 0; border: 0 }
+.builderGroup legend { margin-bottom: 8px; padding: 0; font-size: 12.5px; color: var(--text-muted) }
+.builderGroup label { display: flex; flex-direction: column; gap: 4px; min-width: 0; font-size: 11.5px; color: var(--text-faint) }
+.question { display: flex; flex-direction: column; gap: 6px }
+.qLabel { font-size: 12.5px; color: var(--text-muted) }
+@media (max-width: 48rem) {
+  .agents { grid-template-columns: minmax(0, 1fr) }
+  .agentsPage { padding: 20px 16px 32px }
+}
 .pageTitle { margin: 0; font-size: 1.6rem; font-weight: 300; letter-spacing: -.03em }
 
 /* past chats */
