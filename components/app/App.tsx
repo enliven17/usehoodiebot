@@ -41,6 +41,8 @@ export function App({ signedIn }: { signedIn: boolean }) {
   const [thinking, setThinking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [panel, setPanel] = useState<Panel>("chat");
+  // the team wallet panel, open or shut per view: open beside the chat, shut beside the trade ticket until asked for
+  const [sideOpen, setSideOpen] = useState({ chat: true, trade: false });
   const bottom = useRef<HTMLDivElement>(null);
   const seeded = useRef(false);
 
@@ -110,11 +112,16 @@ export function App({ signedIn }: { signedIn: boolean }) {
     );
   }
 
+  const sideKey = panel === "trade" ? "trade" : "chat";
+  // phones and tablets show the panel as its own page; wider screens slide it open and shut beside the view
+  const toggleWallet = () =>
+    window.matchMedia("(max-width: 65rem)").matches ? setPanel((p) => (p === "team" ? "chat" : "team")) : setSideOpen((o) => ({ ...o, [sideKey]: !o[sideKey] }));
+
   const pending = snap?.approvals.filter((a) => a.status === "pending").length ?? 0;
   const mood: Mood = thinking ? "thinking" : pending ? "listening" : error ? "sad" : "idle";
 
   return (
-    <motion.div className={s.shell} data-panel={panel} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5, ease: EASE }}>
+    <motion.div className={s.shell} data-panel={panel} data-side={sideOpen[sideKey] ? "open" : "closed"} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5, ease: EASE }}>
       <Field targetId="composer" />
       <nav className={s.rail} aria-label="App">
         <Link href="/" className={s.railBrand} aria-label="HOODIEBOT home"><Mark size={26} /></Link>
@@ -127,7 +134,7 @@ export function App({ signedIn }: { signedIn: boolean }) {
         <button type="button" className={s.railBtn} aria-current={panel === "trade" ? "page" : undefined} onClick={() => setPanel("trade")} aria-label="Trade">
           <svg className="i" viewBox="0 0 24 24"><path d="M3 3v16a2 2 0 0 0 2 2h16" /><path d="m19 9-5 5-4-4-3 3" /></svg>
         </button>
-        <button type="button" className={s.railBtn} aria-current={panel === "team" ? "page" : undefined} onClick={() => setPanel("team")} aria-label="Wallet and strategies">
+        <button type="button" className={s.railBtn} aria-current={panel === "team" ? "page" : undefined} aria-pressed={sideOpen[sideKey]} onClick={toggleWallet} aria-label="Team wallet">
           <svg className="i" viewBox="0 0 24 24"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" /><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" /></svg>
           {pending ? <span className={s.badge}>{pending}</span> : null}
         </button>
@@ -177,12 +184,12 @@ export function App({ signedIn }: { signedIn: boolean }) {
             void send(text);
           }}
         >
-          <label htmlFor="prompt" className="sr-only">Message HOODIEBOT</label>
+          <label htmlFor="prompt" className="sr-only">Message Hoodie</label>
           <textarea
             id="prompt"
             rows={1}
             value={text}
-            placeholder="Ask HOODIEBOT…"
+            placeholder="Ask Hoodie…"
             onChange={(e) => {
               setText(e.target.value);
               fieldEvent("typing");
