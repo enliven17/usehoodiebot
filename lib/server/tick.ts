@@ -81,10 +81,10 @@ async function exit(s: Strategy, spec: Spec) {
 }
 
 /** An automatic trade. A send that is not confirmed in time is recorded as "sent" for settle(). Null when the wallet is busy. */
-async function auto(team: Team, a: Parameters<typeof trade>[1], reason: string): Promise<string | null> {
+export async function auto(team: Team, a: Parameters<typeof trade>[1], reason: string, how = "automatically"): Promise<string | null> {
   try {
     const f = await tradeNow(team, a);
-    if (f) await logEvent(team.owner, fillEvent(a.kind, a.symbol, a.token, f, "automatically"));
+    if (f) await logEvent(team.owner, fillEvent(a.kind, a.symbol, a.token, f, how));
     return f?.hash ?? null;
   } catch (err) {
     if (!(err instanceof SentTrade)) {

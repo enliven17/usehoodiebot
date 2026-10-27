@@ -12,10 +12,12 @@ import { ShimmeringText } from "@/components/ui/ShimmeringText";
 
 import { api, type Line, type Snapshot } from "./api";
 import s from "./app.module.css";
+import { History } from "./History";
 import { Message } from "./Message";
 import { Approvals, Positions, SideSkeleton, Strategies, TeamStrip, Wallet } from "./Side";
 import { SignIn } from "./SignIn";
 import { Timeline } from "./Timeline";
+import { Trade } from "./Trade";
 
 /** How often the side panel refreshes: the strategy tick runs every minute, approvals should show up quickly. */
 const POLL_MS = 8_000;
@@ -28,7 +30,7 @@ const STARTERS = [
   ["launch", "What do I need to launch a token on Pons?"],
 ] as const;
 
-type Panel = "chat" | "team";
+type Panel = "chat" | "history" | "trade" | "team";
 
 export function App({ signedIn }: { signedIn: boolean }) {
   const params = useSearchParams();
@@ -119,19 +121,29 @@ export function App({ signedIn }: { signedIn: boolean }) {
         <button type="button" className={s.railBtn} aria-current={panel === "chat" ? "page" : undefined} onClick={() => setPanel("chat")} aria-label="Chat">
           <svg className="i" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
         </button>
+        <button type="button" className={s.railBtn} aria-current={panel === "history" ? "page" : undefined} onClick={() => setPanel("history")} aria-label="Past chats">
+          <svg className="i" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /><path d="M12 7v5l4 2" /></svg>
+        </button>
+        <button type="button" className={s.railBtn} aria-current={panel === "trade" ? "page" : undefined} onClick={() => setPanel("trade")} aria-label="Trade">
+          <svg className="i" viewBox="0 0 24 24"><path d="M3 3v16a2 2 0 0 0 2 2h16" /><path d="m19 9-5 5-4-4-3 3" /></svg>
+        </button>
         <button type="button" className={s.railBtn} aria-current={panel === "team" ? "page" : undefined} onClick={() => setPanel("team")} aria-label="Wallet and strategies">
           <svg className="i" viewBox="0 0 24 24"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" /><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" /></svg>
           {pending ? <span className={s.badge}>{pending}</span> : null}
-        </button>
-        <button type="button" className={s.railBtn} onClick={() => api.newChat().then((r) => setLines(r.lines))} aria-label="New chat">
-          <svg className="i" viewBox="0 0 24 24"><path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z" /></svg>
         </button>
         <button type="button" className={`${s.railBtn} ${s.railEnd}`} onClick={() => api.logout().then(() => setAuthed(false))} aria-label="Sign out">
           <svg className="i" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="m16 17 5-5-5-5" /><path d="M21 12H9" /></svg>
         </button>
       </nav>
 
-      <main className={s.main}>
+      <main className={s.main} data-view={panel === "trade" || panel === "history" ? panel : "chat"}>
+        {panel === "trade" && snap ? <Trade snap={snap} onChange={refresh} /> : null}
+        {panel === "history" ? (
+          <History
+            onNew={() => api.newChat().then((r) => { setLines(r.lines); setPanel("chat"); })}
+            onOpen={(n) => api.openChat(n).then((r) => { setLines(r.lines); setPanel("chat"); }).catch((err) => setError((err as Error).message))}
+          />
+        ) : null}
         <div className={s.thread} aria-live="polite">
           {!lines.length ? (
             <motion.div className={s.empty} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.1, ease: EASE }}>

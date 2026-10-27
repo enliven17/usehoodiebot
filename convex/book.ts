@@ -65,3 +65,24 @@ export const trades = query({
     return (await ctx.db.query("trades").withIndex("by_owner", (q) => q.eq("owner", a.owner)).order("desc").take(20)).map((t) => ({ side: t.side, symbol: t.symbol, wei: t.wei, hash: t.hash, at: t._creationTime }));
   },
 });
+
+/** Every fill in one token, oldest first: the buy and sell marks on its chart. */
+export const tradesFor = query({
+  args: { secret, owner: v.string(), token: v.string() },
+  handler: async (ctx, a) => {
+    guard(a.secret);
+    const rows = await ctx.db.query("trades").withIndex("by_owner_token", (q) => q.eq("owner", a.owner).eq("token", a.token)).take(200);
+    return rows.map((t) => ({ side: t.side, wei: t.wei, tokens: t.tokens, hash: t.hash, at: t._creationTime }));
+  },
+});
+
+/** Tokens the team has traded, newest first, one row each. */
+export const tradedTokens = query({
+  args: { secret, owner: v.string() },
+  handler: async (ctx, a) => {
+    guard(a.secret);
+    const rows = await ctx.db.query("trades").withIndex("by_owner", (q) => q.eq("owner", a.owner)).order("desc").take(200);
+    const seen = new Set<string>();
+    return rows.filter((t) => !seen.has(t.token) && seen.add(t.token)).map((t) => ({ token: t.token, symbol: t.symbol, at: t._creationTime }));
+  },
+});

@@ -33,6 +33,7 @@ export type Candidate = {
 
 type Pool = {
   attributes?: {
+    address?: string;
     name?: string;
     base_token_price_native_currency?: string;
     quote_token_price_usd?: string;
@@ -77,18 +78,19 @@ export function toCandidate(p: Pool, venue: Venue, now: number): Candidate | nul
 }
 
 // ponytail: per-instance memory cache; a shared cache (KV) only if serverless cold starts start hitting the rate limit.
-const cache = new Map<string, { at: number; data: Promise<Pool[]> }>();
-function pools(url: string): Promise<Pool[]> {
+const cache = new Map<string, { at: number; data: Promise<unknown> }>();
+function gt<T>(url: string, ttl = TTL_MS): Promise<T> {
   const hit = cache.get(url);
-  if (hit && Date.now() - hit.at < TTL_MS) return hit.data;
+  if (hit && Date.now() - hit.at < ttl) return hit.data as Promise<T>;
   const data = fetch(url, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(15_000) }).then(async (r) => {
     if (!r.ok) throw new Error(`geckoterminal ${r.status}`);
-    return ((await r.json()) as { data?: Pool[] }).data ?? [];
+    return (await r.json()) as T;
   });
   data.catch(() => cache.delete(url));
   cache.set(url, { at: Date.now(), data });
   return data;
 }
+const pools = (url: string) => gt<{ data?: Pool[] }>(url).then((j) => j.data ?? []);
 
 /** Fresh launches and the busiest curve tokens, then the busiest graduated ones. Deduplicated by token. */
 export async function candidates(): Promise<Candidate[]> {
@@ -105,4 +107,29 @@ export async function candidates(): Promise<Candidate[]> {
   ].filter((c): c is Candidate => c !== null);
   const seen = new Set<string>();
   return all.filter((c) => !seen.has(c.token) && seen.add(c.token));
+}
+
+/** Candle sizes the chart offers, as GeckoTerminal's timeframe and aggregate. */
+export const TIMEFRAMES = { "1m": ["minute", 1, 60], "5m": ["minute", 5, 300], "15m": ["minute", 15, 900], "1h": ["hour", 1, 3600], "4h": ["hour", 4, 14_400], "1d": ["day", 1, 86_400] } as const;
+export type Timeframe = keyof typeof TIMEFRAMES;
+export type Candle = { time: number; open: number; high: number; low: number; close: number; volume: number };
+
+/** A token's busiest pool (curve or graduated) with its market numbers. */
+export async function tokenMarket(token: string): Promise<(Candidate & { pool: string }) | null> {
+  const list = await pools(`${GT}/tokens/${token.toLowerCase()}/pools?page=1`);
+  const p = list.find((x) => x.relationships?.dex?.data?.id?.startsWith("pons-v2")) ?? list[0];
+  const pool = p?.attributes?.address;
+  if (!p || !pool) return null;
+  const c = toCandidate(p, p.relationships?.dex?.data?.id === "pons-v2" ? "curve" : "graduated", Date.now());
+  return c && { ...c, pool };
+}
+
+/** Candles in ETH (GeckoTerminal's price in the quote token), oldest first. */
+export async function candles(pool: string, tf: Timeframe): Promise<Candle[]> {
+  const [unit, aggregate] = TIMEFRAMES[tf];
+  const j = await gt<{ data?: { attributes?: { ohlcv_list?: number[][] } } }>(`${GT}/pools/${pool.toLowerCase()}/ohlcv/${unit}?aggregate=${aggregate}&limit=300&currency=token`, 30_000);
+  return (j.data?.attributes?.ohlcv_list ?? [])
+    .map(([time, open, high, low, close, volume]) => ({ time: time!, open: open!, high: high!, low: low!, close: close!, volume: volume ?? 0 }))
+    .filter((c) => [c.time, c.open, c.high, c.low, c.close].every(Number.isFinite))
+    .reverse();
 }

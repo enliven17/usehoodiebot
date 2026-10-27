@@ -37,12 +37,15 @@
 .send[data-ready] { border-color: transparent; background: linear-gradient(135deg, var(--cyan-200), var(--violet-200)); color: var(--ink-950) }
 
 /* side */
-.side { position: relative; z-index: 3; overflow-y: auto; padding: 16px; border-left: 1px solid var(--border); background: rgba(6, 9, 14, .86); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, .14) transparent }
-.block { padding: 16px; margin-bottom: 12px; border-radius: var(--radius); border: 1px solid var(--border); background: rgba(9, 12, 18, .7) }
-.blockTitle { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 14px; font-weight: 500; color: var(--text) }
+/* side: a flat trading panel, see-through, sections split by hairlines instead of cards */
+.side { position: relative; z-index: 3; overflow-y: auto; padding: 0 18px; border-left: 1px solid var(--border); background: transparent; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, .14) transparent }
+.block { padding: 18px 0; border-bottom: 1px solid var(--border) }
+.block:last-child { border-bottom: 0 }
+.blockTitle { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 13px; font-weight: 500; color: var(--text-2) }
 .count { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: rgba(124, 232, 242, .14); color: var(--cyan-200); font-family: var(--font-mono); font-size: 12px }
 
-.approval { display: flex; gap: 10px; padding: 12px; margin-bottom: 8px; border-radius: 12px; border: 1px solid rgba(124, 232, 242, .22); background: rgba(124, 232, 242, .05) }
+.approval { display: flex; gap: 10px; padding: 12px 0; border-top: 1px solid var(--border) }
+.approval:first-of-type { border-top: 0; padding-top: 0 }
 .approvalBody { min-width: 0; flex: 1 }
 .approvalWhat { margin: 0; font-family: var(--font-mono); font-size: 14px; color: var(--text) }
 .approvalWhy { margin: 4px 0 10px; font-size: 13px; line-height: 1.45; color: var(--text-muted) }
@@ -52,8 +55,9 @@
 .recent a { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted) }
 
 .balances { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px }
-.balances div { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 12px; background: rgba(255, 255, 255, .03); font-size: 12px }
-.balances strong { font-size: 15px; font-weight: 500; color: var(--text) }
+.balances div { display: flex; flex-direction: column; gap: 4px; font-size: 12px }
+.balances div + div { padding-left: 12px; border-left: 1px solid var(--border) }
+.balances strong { font-size: 17px; font-weight: 500; color: var(--text) }
 .addressRow { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 14px }
 .addressRow a { color: var(--text-2); text-decoration: none }
 .addressRow :global(.btn) { height: 34px; font-size: 13px }
@@ -66,7 +70,8 @@
 .item a { color: var(--text-2); text-decoration: none }
 .item a:hover { color: var(--text) }
 
-.strategy { padding: 12px; margin-bottom: 8px; border-radius: 12px; border: 1px solid var(--border); background: rgba(255, 255, 255, .02) }
+.strategy { padding: 12px 0; border-top: 1px solid var(--border) }
+.strategy:first-of-type { border-top: 0; padding-top: 0 }
 .strategy[data-off] { opacity: .6 }
 .strategyHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 14px }
 .strategyHead :global(.btn) { height: 30px; padding: 0 10px; font-size: 12px }
@@ -83,6 +88,70 @@
 .signinTitle { margin: 8px 0 0; font-size: 2rem; font-weight: 300; letter-spacing: -.04em }
 .signinText { margin: 0 0 16px; color: var(--text-muted); font-size: 15px; line-height: 1.55 }
 
+/* views inside main */
+.main[data-view="trade"] > .thread, .main[data-view="trade"] > .composer, .main[data-view="history"] > .thread, .main[data-view="history"] > .composer { display: none }
+.main[data-view="trade"], .main[data-view="history"] { background: rgba(4, 6, 10, .94) }
+.pageTitle { margin: 0; font-size: 1.6rem; font-weight: 300; letter-spacing: -.03em }
+
+/* past chats */
+.history { flex: 1; overflow-y: auto; padding: 32px max(20px, calc((100% - 720px) / 2)) }
+.historyHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px }
+.chatList { margin: 0; padding: 0; list-style: none }
+.chatRow { display: flex; align-items: center; gap: 16px; width: 100%; padding: 14px 4px; border-top: 1px solid var(--border); text-align: left; color: var(--text-2); transition: color .15s, background-color .15s }
+.chatList li:first-child .chatRow { border-top: 0 }
+.chatRow:hover { color: var(--text); background: var(--surface-hover) }
+.chatRow[aria-current] { color: var(--text) }
+.chatRow time { margin-left: auto; font-size: 12px }
+.chatTitle { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 14.5px }
+
+/* trade */
+.trade { flex: 1; display: grid; grid-template-columns: 220px minmax(0, 1fr); min-height: 0 }
+.tokens { display: flex; flex-direction: column; min-height: 0; padding: 14px 10px 0 14px; border-right: 1px solid var(--border) }
+.tokens :global(.field) { width: 100%; margin-bottom: 8px }
+.tokenList { flex: 1; overflow-y: auto; margin: 0 -6px 0 0; padding: 0 6px 12px 0; list-style: none; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, .14) transparent }
+.tokenList li[data-split] { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border) }
+.tokenRow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; width: 100%; padding: 8px 10px; margin-bottom: 2px; border-radius: 10px; text-align: left; font-size: 12.5px; transition: background-color .15s }
+.tokenRow:hover { background: var(--surface-hover) }
+.tokenRow[aria-current] { background: var(--surface-active) }
+.tokenSym { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 14px; color: var(--text) }
+.tokenSub { font-size: 11.5px; color: var(--text-faint) }
+.tokenRow > :nth-child(even) { text-align: right }
+.desk { min-width: 0; overflow-y: auto; padding: 16px 20px 24px; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, .14) transparent }
+.deskHead { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 28px; padding-bottom: 14px; border-bottom: 1px solid var(--border) }
+.deskName h1 { margin: 0; font-size: 1.5rem; font-weight: 400; letter-spacing: -.02em }
+.deskName a { font-size: 12px; color: var(--text-muted); text-decoration: none }
+.deskName a:hover { color: var(--text) }
+.deskPrice { display: flex; align-items: baseline; gap: 10px }
+.deskPrice strong { font-size: 1.35rem; font-weight: 500 }
+.stats { display: flex; flex-wrap: wrap; gap: 6px 22px; margin: 0 0 0 auto }
+.stats div { display: flex; flex-direction: column; gap: 2px }
+.stats dt { font-size: 11.5px; color: var(--text-faint) }
+.stats dd { margin: 0; font-size: 13px; color: var(--text-2) }
+.chartWrap { position: relative; padding: 12px 0 0 }
+.chartWrap > .seg { display: inline-flex; margin-bottom: 8px }
+.chartWrap > .seg button { flex: none; padding: 5px 10px; font-family: var(--font-mono) }
+.chart { height: min(52vh, 460px); min-height: 280px }
+.chartState { position: absolute; inset: 50px 0 0; display: grid; place-items: center; margin: 0; font-size: 13px; color: var(--text-muted); pointer-events: none }
+.deskGrid { display: grid; grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); gap: 0 28px; border-top: 1px solid var(--border) }
+.deskGrid > .block { border-bottom: 0 }
+.amount { display: flex; align-items: center; gap: 10px }
+.amount :global(.field) { flex: 1 }
+.presets { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 12px }
+.presets :global(.chip)[aria-pressed="true"] { border-color: var(--border-strong); color: var(--text) }
+.go { width: 100% }
+.note a { color: var(--text-2) }
+.fill { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto auto; gap: 12px; align-items: center; padding: 8px 0; border-top: 1px solid var(--border); font-size: 13.5px }
+.fill:first-child { border-top: 0 }
+.fill a { font-size: 12px; color: var(--text-muted); text-decoration: none }
+.fill a:hover { color: var(--text) }
+.subTitle { margin: 16px 0 6px; font-size: 13px; font-weight: 500; color: var(--text-2) }
+.why { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0 6px 10px; border-left: 2px solid var(--eye); margin-bottom: 4px; font-size: 13px; line-height: 1.45; color: var(--text-2) }
+.why strong { font-weight: 500; color: var(--text) }
+.why time { flex: none; font-size: 11.5px }
+
+@media (max-width: 80rem) {
+  .deskGrid { grid-template-columns: minmax(0, 1fr) }
+}
 @media (max-width: 65rem) {
   .shell { grid-template-columns: var(--rail-w) minmax(0, 1fr) }
   .side { display: none }
@@ -98,6 +167,15 @@
   .main, .side { grid-row: 1 }
   .thread { padding: 20px 16px 12px }
   .composer { margin: 0 12px 12px }
+  .trade { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) }
+  .tokens { padding: 12px 12px 0; border-right: 0; border-bottom: 1px solid var(--border) }
+  .tokenList { display: flex; gap: 6px; overflow-x: auto; margin: 0; padding: 0 0 10px }
+  .tokenList li { flex: none; width: 150px }
+  .tokenList li[data-split] { margin: 0; padding: 0; border: 0 }
+  .desk { padding: 14px 16px 20px }
+  .stats { margin: 0 }
+  .chart { height: 300px }
+  .history { padding: 20px 16px }
 }
 @media (prefers-reduced-transparency: reduce) {
   .rail, .composer, .side, .bubble, .signin { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--surface-solid) }
@@ -147,7 +225,7 @@
 .pnl > :first-child { width: 100% }
 
 /* skeleton */
-.skeleton { position: relative; overflow: hidden; background: rgba(9, 12, 18, .7) }
+.skeleton { position: relative; overflow: hidden; border-radius: 12px; background: rgba(255, 255, 255, .03) }
 .skeleton::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, .04) 50%, transparent 80%); animation: shimmer 1.4s var(--ease) infinite; animation-delay: inherit }
 @keyframes shimmer { to { transform: translateX(100%) } }
 @media (prefers-reduced-motion: reduce) { .skeleton::after { animation: none } }

@@ -1,7 +1,13 @@
+import type { Candidate } from "@/lib/chain/market";
 import type { Line } from "@/lib/lines";
 import type { Snapshot } from "@/lib/server/snapshot";
 
+import type { Candle, Fill } from "./Chart";
+
 export type { Line, Snapshot };
+export type Chat = { thread: number; title: string; at: number; open: boolean };
+export type MarketToken = Partial<Candidate> & { token: string; symbol: string; group: "held" | "traded" | "market" };
+export type TokenView = { market: (Candidate & { pool: string }) | null; candles: Candle[]; trades: Fill[]; position: { tokens: number; costEth: number } | null };
 
 async function call<T>(path: string, init?: RequestInit & { json?: unknown }): Promise<T> {
   const res = await fetch(path, {
@@ -19,6 +25,11 @@ export const api = {
   createTeam: () => call<Snapshot>("/api/team", { method: "POST" }),
   lines: () => call<{ lines: Line[] }>("/api/chat"),
   send: (text: string) => call<{ lines: Line[] }>("/api/chat", { method: "POST", json: { text } }),
+  chats: () => call<{ threads: Chat[] }>("/api/chat/threads"),
+  openChat: (thread: number) => call<{ lines: Line[] }>("/api/chat/open", { method: "POST", json: { thread } }),
+  market: () => call<{ tokens: MarketToken[] }>("/api/market"),
+  token: (token: string, tf: string) => call<TokenView>(`/api/market/${token}?tf=${tf}`),
+  trade: (t: { side: "buy" | "sell"; token: string; symbol: string; eth?: string; pct?: number }) => call<{ hash: string; pending?: boolean }>("/api/trade", { method: "POST", json: t }),
   newChat: () => call<{ lines: Line[] }>("/api/chat/new", { method: "POST" }),
   decide: (id: string, approve: boolean) => call<{ status: string; result: { hash?: string; error?: string } | null }>(`/api/approvals/${id}`, { method: "POST", json: { approve } }),
   strategy: (id: string, patch: { active?: boolean; mode?: "ask" | "auto" }) => call(`/api/strategies/${id}`, { method: "PATCH", json: patch }),
