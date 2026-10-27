@@ -78,20 +78,29 @@ export function exitReason(s: Spec, entryEth: number, priceEth: number): "take p
   return null;
 }
 
-/** One line a person can read back, e.g. on the strategy card. */
-export function describe(s: Spec): string[] {
-  const usd = (n: number) => (n >= 1000 ? `$${(n / 1000).toFixed(n % 1000 ? 1 : 0)}k` : `$${n}`);
-  const out = [`size ${s.sizeEth} ETH`, `slippage ${s.slippageBps / 100}%`, `max ${s.maxOpen} open`];
-  if (s.minMcapUsd !== undefined) out.push(`mcap ≥ ${usd(s.minMcapUsd)}`);
-  if (s.maxMcapUsd !== undefined) out.push(`mcap ≤ ${usd(s.maxMcapUsd)}`);
-  if (s.minLiquidityUsd !== undefined) out.push(`liquidity ≥ ${usd(s.minLiquidityUsd)}`);
-  if (s.minVolume1hUsd !== undefined) out.push(`1h volume ≥ ${usd(s.minVolume1hUsd)}`);
-  if (s.minCurvePct !== undefined || s.maxCurvePct !== undefined) out.push(`curve ${s.minCurvePct ?? 0}–${s.maxCurvePct ?? 100}%`);
-  if (s.maxAgeMinutes !== undefined) out.push(`age ≤ ${s.maxAgeMinutes}m`);
-  if (s.minBuySellRatio !== undefined) out.push(`buys/sells ≥ ${s.minBuySellRatio}`);
-  if (s.takeProfitPct !== undefined) out.push(`take profit +${s.takeProfitPct}%`);
-  if (s.stopLossPct !== undefined) out.push(`stop −${s.stopLossPct}%`);
+export type Tone = "up" | "down";
+export type RuleRow = [label: string, value: string, tone?: Tone];
+
+const usd = (n: number) => (n >= 1000 ? `$${(n / 1000).toFixed(n % 1000 ? 1 : 0)}k` : `$${n}`);
+const range = (min: number | undefined, max: number | undefined, f: (n: number) => string) =>
+  min !== undefined && max !== undefined ? `${f(min)} to ${f(max)}` : max !== undefined ? `up to ${f(max)}` : `${f(min!)} or more`;
+const minutes = (m: number) => (m >= 60 && m % 60 === 0 ? `${m / 60}h` : `${m}m`);
+
+/** The rules as label and value, the way a person reads them back. Values stay ASCII: they are set in the mono face. */
+export function ruleRows(s: Spec): RuleRow[] {
+  const out: RuleRow[] = [["Size", `${s.sizeEth} ETH`], ["Slippage", `${s.slippageBps / 100}%`], ["Open at once", `up to ${s.maxOpen}`]];
+  if (s.minMcapUsd !== undefined || s.maxMcapUsd !== undefined) out.push(["Market cap", range(s.minMcapUsd, s.maxMcapUsd, usd)]);
+  if (s.minLiquidityUsd !== undefined) out.push(["Liquidity", `${usd(s.minLiquidityUsd)} or more`]);
+  if (s.minVolume1hUsd !== undefined) out.push(["Volume, 1h", `${usd(s.minVolume1hUsd)} or more`]);
+  if (s.minCurvePct !== undefined || s.maxCurvePct !== undefined) out.push(["Curve", range(s.minCurvePct, s.maxCurvePct, (n) => `${n}%`)]);
+  if (s.maxAgeMinutes !== undefined) out.push(["Age", `under ${minutes(s.maxAgeMinutes)}`]);
+  if (s.minBuySellRatio !== undefined) out.push(["Buys vs sells", `${s.minBuySellRatio}x or more`]);
+  if (s.takeProfitPct !== undefined) out.push(["Take profit", `+${s.takeProfitPct}%`, "up"]);
+  if (s.stopLossPct !== undefined) out.push(["Stop loss", `-${s.stopLossPct}%`, "down"]);
   return out;
 }
+
+/** One line per rule, for the model and for text. */
+export const describe = (s: Spec): string[] => ruleRows(s).map(([k, v]) => `${k}: ${v}`);
 
 export const WATCH_LABEL: Record<Spec["watch"], string> = { new: "New Pons launches", curve: "Tokens on the Pons curve", graduated: "Graduated Uniswap v4 pools", all: "All Pons tokens" };
