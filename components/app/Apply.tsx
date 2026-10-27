@@ -5,8 +5,9 @@ import { useEffect, useRef, useState } from "react";
 
 import { Hoodie } from "@/components/Hoodie";
 import { checkOne, QUESTIONS, type Answers, type Question } from "@/lib/apply";
+import { addressUrl } from "@/lib/chain/robinhood-urls";
 
-import { api } from "./api";
+import { api, type TokenGate } from "./api";
 import s from "./app.module.css";
 
 const EASE = [0.2, 0.7, 0.2, 1] as const;
@@ -25,7 +26,7 @@ const load = (): Answers => {
  * The way in: one question per screen, a draft kept in the browser, then a last look before sending. After sending, the
  * owner is on the waitlist; the app opens by itself once an admin approves them.
  */
-export function Apply({ status, onSent, onSignOut }: { status: "none" | "pending" | "rejected"; onSent: () => void; onSignOut: () => void }) {
+export function Apply({ status, token, onSent, onSignOut }: { status: "none" | "pending" | "rejected" | "needs_token"; token: TokenGate; onSent: () => void; onSignOut: () => void }) {
   const [at, setAt] = useState(0);
   const [answers, setAnswers] = useState<Answers>({});
   const [error, setError] = useState<string | null>(null);
@@ -48,6 +49,21 @@ export function Apply({ status, onSent, onSignOut }: { status: "none" | "pending
     const t = setTimeout(() => (input.current ?? submit.current)?.focus({ preventScroll: true }), 320);
     return () => clearTimeout(t);
   }, [at]);
+
+  if (status === "needs_token" && token.live) {
+    return (
+      <div className={s.signin}>
+        <Hoodie size={120} mood="listening" />
+        <h1 className={s.signinTitle}>Hold $HOODIE to enter</h1>
+        <p className={s.signinText}>
+          You are approved. Hoodie is for $HOODIE holders: keep {token.min.toLocaleString("en-US")} $HOODIE in the wallet you signed in with
+          {token.held !== null ? ` (it holds ${Math.floor(token.held).toLocaleString("en-US")} now)` : ""}. This page opens your team by itself once it does.
+        </p>
+        <a className="btn btn-primary" href={addressUrl(token.address)} target="_blank" rel="noopener">View $HOODIE</a>
+        <button type="button" className={s.linkish} onClick={onSignOut}>Sign out</button>
+      </div>
+    );
+  }
 
   if (status !== "none") {
     return (
@@ -143,6 +159,7 @@ export function Apply({ status, onSent, onSignOut }: { status: "none" | "pending
           ) : (
             <Ask
               q={q!}
+              live={token.live}
               value={answers[q!.id]}
               input={input}
               onChange={(v) => {
@@ -168,9 +185,17 @@ export function Apply({ status, onSent, onSignOut }: { status: "none" | "pending
   );
 }
 
-function Ask({ q, value, input, onChange }: { q: Question; value: string | string[] | undefined; input: React.RefObject<(HTMLInputElement & HTMLTextAreaElement) | null>; onChange: (v: string | string[]) => void }) {
+function Ask({ q, live, value, input, onChange }: { q: Question; live: boolean; value: string | string[] | undefined; input: React.RefObject<(HTMLInputElement & HTMLTextAreaElement) | null>; onChange: (v: string | string[]) => void }) {
   const title = <h1 className={s.askTitle}>{q.label}{q.optional ? <span className="faint"> · optional</span> : null}</h1>;
   const hint = q.hint ? <p className={s.qHint}>{q.hint}</p> : null;
+  if (q.kind === "token" && live) {
+    return (
+      <>
+        <h1 className={s.askTitle}>{q.label}</h1>
+        <p className={s.qHint}>We read it from the wallet you signed in with when you send the application. Holders move to the front of the line.</p>
+      </>
+    );
+  }
   if (q.kind === "token") {
     return (
       <>
