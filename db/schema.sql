@@ -6,6 +6,8 @@ create table if not exists teams (
   policy_id text not null,
   -- one transaction at a time per wallet (nonces): a lease, since the HTTP driver holds no session
   busy_until timestamptz,
+  -- the open conversation; history is append-only within a thread, a new chat starts the next one
+  thread int not null default 0,
   created_at timestamptz not null default now()
 );
 
@@ -13,11 +15,12 @@ create table if not exists teams (
 create table if not exists messages (
   id bigserial primary key,
   owner text not null references teams(owner),
+  thread int not null default 0,
   role text not null check (role in ('user', 'assistant')),
   content jsonb not null,
   created_at timestamptz not null default now()
 );
-create index if not exists messages_owner on messages(owner, id);
+create index if not exists messages_thread on messages(owner, thread, id);
 
 create table if not exists strategies (
   id uuid primary key default gen_random_uuid(),
@@ -81,3 +84,5 @@ create table if not exists trades (
 );
 
 alter table teams add column if not exists busy_until timestamptz;
+alter table teams add column if not exists thread int not null default 0;
+alter table messages add column if not exists thread int not null default 0;
