@@ -16,7 +16,6 @@
     "brand": "node brand/render.mjs"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^1.3.0",
     "@bible-strong/avatar-core": "^0.1.0",
     "@bible-strong/avatar-react": "^0.1.0",
     "@gsap/react": "^2.1.2",

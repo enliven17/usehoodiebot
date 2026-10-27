@@ -16,7 +16,7 @@ export const thread = query({
 });
 
 export const append = mutation({
-  args: { secret, owner: v.string(), thread: v.number(), role: v.union(v.literal("user"), v.literal("assistant")), content: v.string() },
+  args: { secret, owner: v.string(), thread: v.number(), role: v.union(v.literal("user"), v.literal("assistant"), v.literal("tool")), content: v.string() },
   handler: async (ctx, { secret: s, ...m }) => {
     guard(s);
     return (await ctx.db.insert("messages", m)) as string;

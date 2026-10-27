@@ -16,11 +16,11 @@ export default defineSchema({
     thread: v.number(),
   }).index("by_owner", ["owner"]),
 
-  /** The Claude API's own content blocks as JSON text, so thinking blocks go back byte for byte. */
+  /** Each chat message as JSON text (OpenAI-style: user, assistant with tool calls, tool results). */
   messages: defineTable({
     owner: v.string(),
     thread: v.number(),
-    role: v.union(v.literal("user"), v.literal("assistant")),
+    role: v.union(v.literal("user"), v.literal("assistant"), v.literal("tool")),
     content: v.string(),
   }).index("by_thread", ["owner", "thread"]),
 

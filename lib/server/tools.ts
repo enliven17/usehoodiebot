@@ -1,6 +1,5 @@
 import "server-only";
 
-import type Anthropic from "@anthropic-ai/sdk";
 import { formatEther, parseEther } from "viem";
 
 import { addressUrl } from "../chain/robinhood";
@@ -10,9 +9,11 @@ import { publicClient } from "../chain/robinhood";
 import { api, mutate, query } from "../db";
 import { describe, parseSpec, SPEC_LIMITS, WATCH_LABEL } from "../strategy";
 import type { Member } from "../team";
+import { safeMessage } from "./errors";
+import type { ToolDef } from "./llm";
 import { getExecutor, normalizeToken, propose, type Team } from "./team";
 
-type Tool = Anthropic.Beta.BetaTool & { member: Member; run: (team: Team, input: Record<string, unknown>) => Promise<unknown> };
+type Tool = { name: string; description: string; input_schema: Record<string, unknown>; member: Member; run: (team: Team, input: Record<string, unknown>) => Promise<unknown> };
 
 const obj = (properties: Record<string, unknown>, required: string[] = []) => ({ type: "object" as const, properties, required, additionalProperties: false });
 const usd = (n?: number) => (n === undefined ? null : Math.round(n));
@@ -134,7 +135,7 @@ export const TOOLS: Tool[] = [
 ];
 
 export const TOOL_MEMBER = Object.fromEntries(TOOLS.map((t) => [t.name, t.member])) as Record<string, Member>;
-export const apiTools = (): Anthropic.Beta.BetaTool[] => TOOLS.map(({ member: _m, run: _r, ...t }) => t);
+export const apiTools = (): ToolDef[] => TOOLS.map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.input_schema } }));
 
 export async function runTool(team: Team, name: string, input: unknown): Promise<{ content: string; isError: boolean }> {
   const tool = TOOLS.find((t) => t.name === name);
@@ -144,6 +145,6 @@ export async function runTool(team: Team, name: string, input: unknown): Promise
     const isError = !!out && typeof out === "object" && "error" in out;
     return { content: JSON.stringify(out), isError };
   } catch (err) {
-    return { content: `Failed: ${err instanceof Error ? err.message.slice(0, 300) : String(err)}`, isError: true };
+    return { content: `Failed: ${safeMessage(err)}`, isError: true };
   }
 }
