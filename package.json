@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit -p .",
     "test": "tsx --test lib/**/*.test.ts",
     "convex": "convex dev",
-    "brand": "node brand/render.mjs"
+    "brand": "node brand/render.mjs",
+    "e2e": "tsx scripts/e2e.ts"
   },
   "dependencies": {
     "@bible-strong/avatar-core": "^0.1.0",
