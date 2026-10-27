@@ -41,3 +41,28 @@ console.log("    steps", reply.steps.map((s) => `${s.member}:${s.tool}`).join(",
 console.log("    reply", reply.text.slice(0, 300).replace(/\n/g, " "));
 const snap = (await step("snapshot", () => call("/api/team"))) as { events: Array<{ member: string; text: string }> };
 console.log("    events", snap.events.map((e) => `${e.member}: ${e.text}`).slice(0, 4));
+
+// --strategy: save a loose strategy through chat, wait for the minute tick to match a token, then approve it. The
+// throwaway wallet holds no ETH, so the approval must fail safely with the balance message (no transaction is sent).
+if (process.argv.includes("--strategy")) {
+  await step("strategy via chat", () =>
+    call("/api/chat", { method: "POST", json: { text: "Save a strategy named E2E: watch all Pons tokens, 0.001 ETH per entry, no other filters. Do not ask me anything, just save it." } }),
+  );
+  const saved = (await call("/api/team")) as { strategies: Array<{ name: string; mode: string }> };
+  console.log("    strategies", saved.strategies.map((s) => `${s.name} (${s.mode})`));
+  let ask: { id: string; symbol: string } | undefined;
+  for (let i = 0; i < 18 && !ask; i++) {
+    await new Promise((r) => setTimeout(r, 10_000));
+    const snap = (await call("/api/team")) as { approvals: Array<{ id: string; symbol: string; status: string }> };
+    ask = snap.approvals.find((a) => a.status === "pending");
+  }
+  if (!ask) throw new Error("no approval appeared within 3 minutes");
+  console.log("ok  tick matched and asked:", ask.symbol);
+  const decided = (await call(`/api/approvals/${ask.id}`, { method: "POST", json: { approve: true } })) as { status: string; result: { error?: string } };
+  console.log(`ok  approve -> ${decided.status}: ${decided.result?.error}`);
+  const snap = (await call("/api/team")) as { events: Array<{ member: string; kind: string; text: string }>; strategies: Array<{ id: string }> };
+  console.log("    events", snap.events.slice(0, 5).map((e) => `${e.member}/${e.kind}: ${e.text}`));
+  // the throwaway team must not keep matching every minute
+  for (const s of snap.strategies) await call(`/api/strategies/${s.id}`, { method: "DELETE" });
+  console.log("ok  cleaned up the test strategy");
+}
