@@ -1,0 +1,8 @@
+.root { display: inline-grid; justify-items: center }
+.root > * { grid-column: 1; grid-row: 1; display: flex; align-items: center; gap: inherit }
+.ghost { visibility: hidden }
+.layer { gap: 6px }
+.spinner { width: 16px; height: 16px }
+.spinner rect { animation: spin-opacity 1s linear infinite }
+@keyframes spin-opacity { from { opacity: 1 } to { opacity: .15 } }
+@media (prefers-reduced-motion: reduce) { .spinner rect { animation-duration: 2s } }
