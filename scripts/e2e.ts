@@ -33,6 +33,19 @@ const account = privateKeyToAccount(generatePrivateKey());
 const { nonce } = (await step("nonce", () => call("/api/auth/nonce"))) as { nonce: string };
 const signature = await account.signMessage({ message: signInMessage(account.address, nonce) });
 await step("verify", () => call("/api/auth/verify", { method: "POST", json: { address: account.address, signature } }));
+
+// the waitlist: a new owner applies; unless the app runs with OPEN_ACCESS=1 (local), no team wallet until an admin approves
+const before = (await step("access", () => call("/api/access"))) as { status: string };
+console.log("    access", before.status);
+if (before.status !== "approved") {
+  const answers = { x: "hoodie_e2e", telegram: "hoodie_e2e", experience: "Seasoned, 1 to 3 years", volume: "1 to 10 ETH", purpose: ["Snipe new Pons launches"], why: "End to end check of the waitlist flow." };
+  const sent = (await step("apply", () => call("/api/access", { method: "POST", json: { answers } }))) as { status: string };
+  if (sent.status !== "pending") throw new Error(`application is ${sent.status}`);
+  const blocked = await call("/api/team", { method: "POST" }).catch((e: Error) => e.message);
+  if (typeof blocked !== "string" || !/403/.test(blocked)) throw new Error(`team was not gated: ${JSON.stringify(blocked)}`);
+  console.log("ok  on the waitlist, team creation refused until approved");
+  process.exit(0);
+}
 const team = (await step("team (privy wallet + policy)", () => call("/api/team", { method: "POST" }))) as { wallet: string; spendableEth: string };
 console.log("    team wallet", team.wallet, "spendable", team.spendableEth);
 const chat = (await step("chat", () => call("/api/chat", { method: "POST", json: { text: "What is moving on Pons right now? Keep it short." } }))) as { lines: Array<{ who: string; text: string; steps: Array<{ member: string; tool: string }> }> };

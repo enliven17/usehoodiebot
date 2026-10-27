@@ -5,6 +5,7 @@ import type { Snapshot } from "@/lib/server/snapshot";
 import type { Fill } from "./Chart";
 
 export type { Line, Snapshot };
+export type Access = "approved" | "pending" | "rejected" | "none";
 export type Chat = { thread: number; title: string; at: number; open: boolean };
 export type MarketToken = Partial<Candidate> & { token: string; symbol: string; group: "held" | "traded" | "market" };
 export type TokenView = {
@@ -44,6 +45,8 @@ export const api = {
   strategy: (id: string, patch: { active?: boolean; mode?: "ask" | "auto" }) => call(`/api/strategies/${id}`, { method: "PATCH", json: patch }),
   deleteStrategy: (id: string) => call(`/api/strategies/${id}`, { method: "DELETE" }),
   withdraw: (eth: string) => call<{ hash: string }>("/api/withdraw", { method: "POST", json: { eth } }),
+  access: () => call<{ status: Access; admin: boolean }>("/api/access"),
+  apply: (answers: Record<string, string | string[]>) => call<{ status: Access }>("/api/access", { method: "POST", json: { answers } }),
   nonce: () => call<{ nonce: string }>("/api/auth/nonce"),
   verify: (address: string, signature: string) => call<{ owner: string }>("/api/auth/verify", { method: "POST", json: { address, signature } }),
   logout: () => call("/api/auth/logout", { method: "POST" }),

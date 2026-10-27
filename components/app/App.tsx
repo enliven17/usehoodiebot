@@ -10,7 +10,8 @@ import { Hoodie, type Mood } from "@/components/Hoodie";
 import { Mark } from "@/components/Logo";
 import { ShimmeringText } from "@/components/ui/ShimmeringText";
 
-import { api, type Line, type Snapshot } from "./api";
+import { api, type Access, type Line, type Snapshot } from "./api";
+import { Apply } from "./Apply";
 import s from "./app.module.css";
 import { History } from "./History";
 import { Message } from "./Message";
@@ -35,6 +36,9 @@ type Panel = "chat" | "history" | "trade" | "team";
 export function App({ signedIn }: { signedIn: boolean }) {
   const params = useSearchParams();
   const [authed, setAuthed] = useState(signedIn);
+  // let in yet? null while it is being asked
+  const [gate, setGate] = useState<Access | null>(null);
+  const [admin, setAdmin] = useState(false);
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
   const [text, setText] = useState("");
@@ -56,8 +60,22 @@ export function App({ signedIn }: { signedIn: boolean }) {
     }
   }, []);
 
+  // where the application stands; a pending one is asked again now and then so the app opens the moment it is approved
   useEffect(() => {
-    if (!authed) return;
+    if (!authed) return setGate(null);
+    let live = true;
+    const ask = () =>
+      api.access().then((r) => live && (setGate(r.status), setAdmin(r.admin))).catch((err) => live && (err as { status?: number }).status === 401 && setAuthed(false));
+    void ask();
+    const t = setInterval(() => !document.hidden && ask(), 20_000);
+    return () => {
+      live = false;
+      clearInterval(t);
+    };
+  }, [authed]);
+
+  useEffect(() => {
+    if (!authed || gate !== "approved") return;
     void refresh();
     api.lines().then((r) => setLines(r.lines)).catch(() => {});
     const t = setInterval(() => !document.hidden && refresh(), POLL_MS);
@@ -67,7 +85,7 @@ export function App({ signedIn }: { signedIn: boolean }) {
       clearInterval(t);
       window.removeEventListener("focus", onFocus);
     };
-  }, [authed, refresh]);
+  }, [authed, gate, refresh]);
 
   useEffect(() => {
     void bottom.current?.scrollIntoView({ block: "end", behavior: "smooth" });
@@ -112,6 +130,17 @@ export function App({ signedIn }: { signedIn: boolean }) {
     );
   }
 
+  if (gate !== "approved") {
+    return (
+      <>
+        <Field />
+        <motion.main className={s.solo} initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.45, ease: EASE }}>
+          {gate === null ? <Hoodie size={96} mood="thinking" /> : <Apply status={gate} onSent={() => setGate("pending")} onSignOut={() => api.logout().then(() => setAuthed(false))} />}
+        </motion.main>
+      </>
+    );
+  }
+
   const sideKey = panel === "trade" ? "trade" : "chat";
   // phones and tablets show the panel as its own page; wider screens slide it open and shut beside the view
   const toggleWallet = () =>
@@ -138,7 +167,12 @@ export function App({ signedIn }: { signedIn: boolean }) {
           <svg className="i" viewBox="0 0 24 24"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" /><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" /></svg>
           {pending ? <span className={s.badge}>{pending}</span> : null}
         </button>
-        <button type="button" className={`${s.railBtn} ${s.railEnd}`} onClick={() => api.logout().then(() => setAuthed(false))} aria-label="Sign out">
+        {admin ? (
+          <Link href="/admin" className={`${s.railBtn} ${s.railEnd}`} aria-label="Admin">
+            <svg className="i" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></svg>
+          </Link>
+        ) : null}
+        <button type="button" className={`${s.railBtn} ${admin ? "" : s.railEnd}`} onClick={() => api.logout().then(() => setAuthed(false))} aria-label="Sign out">
           <svg className="i" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="m16 17 5-5-5-5" /><path d="M21 12H9" /></svg>
         </button>
       </nav>

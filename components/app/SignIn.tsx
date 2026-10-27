@@ -41,7 +41,8 @@ export function SignIn({ onDone }: { onDone: () => void }) {
       const signature = await signMessageAsync({ account: owner, message: signInMessage(owner, nonce) });
       await api.verify(owner, signature);
       setStep("team");
-      await api.createTeam();
+      // the team wallet is made only for approved owners; everyone else goes on to the application
+      if ((await api.access()).status === "approved") await api.createTeam();
       onDone();
     } catch (err) {
       const e = err as { name?: string; shortMessage?: string; message?: string };

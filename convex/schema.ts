@@ -85,6 +85,17 @@ export default defineSchema({
     wei: v.optional(v.string()),
   }).index("by_owner", ["owner"]),
 
+  /** Who asked to get in, what they answered, and the admin's call. Nobody gets a team wallet before "approved". */
+  applications: defineTable({
+    owner: v.string(),
+    answers: v.any(),
+    status: v.union(v.literal("pending"), v.literal("approved"), v.literal("rejected")),
+    decidedAt: v.optional(v.number()),
+    decidedBy: v.optional(v.string()),
+  })
+    .index("by_owner", ["owner"])
+    .index("by_status", ["status"]),
+
   trades: defineTable({
     owner: v.string(),
     side: v.union(v.literal("buy"), v.literal("sell")),

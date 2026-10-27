@@ -283,3 +283,34 @@
 .posLine { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 12.5px }
 .chartLoading { display: block; width: 120px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .5), transparent) 0 0 / 50% 100% no-repeat, rgba(255, 255, 255, .08); animation: sweep 1s var(--ease) infinite }
 @keyframes sweep { from { background-position: -60px 0 } to { background-position: 180px 0 } }
+
+/* application */
+.apply { width: min(560px, 100%); align-items: stretch; text-align: left; gap: 0 }
+.applyTop { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px }
+.progress { height: 2px; margin: 12px 0 22px; border-radius: 2px; background: rgba(255, 255, 255, .08); overflow: hidden }
+.progress span { display: block; height: 100%; background: var(--text); transition: width .35s var(--ease) }
+.ask { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; min-height: 300px }
+.askTitle { margin: 6px 0 0; font-size: clamp(1.35rem, 1.1rem + 1vw, 1.75rem); font-weight: 300; letter-spacing: -.03em; line-height: 1.2 }
+.qHint { margin: 0; font-size: 14px; line-height: 1.5; color: var(--text-muted) }
+.options { display: flex; flex-direction: column; gap: 6px; width: 100%; margin-top: 6px }
+.option { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 48px; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--border); background: rgba(255, 255, 255, .02); text-align: left; font-size: 15px; color: var(--text-2); transition: border-color .15s, background-color .15s, color .15s }
+.option:hover:not(:disabled) { border-color: var(--border-strong); color: var(--text) }
+.option[aria-pressed="true"], .option[aria-checked="true"] { border-color: rgba(255, 255, 255, .5); background: rgba(255, 255, 255, .06); color: var(--text) }
+.option:disabled { opacity: .45; cursor: not-allowed }
+.key { display: grid; place-items: center; flex: none; width: 24px; height: 24px; border-radius: 6px; border: 1px solid var(--border); font-size: 11.5px; color: var(--text-muted) }
+.option[aria-pressed="true"] .key, .option[aria-checked="true"] .key { background: var(--text); border-color: var(--text); color: var(--ink-950) }
+.ask :global(.field) { width: 100%; margin-top: 6px; font-size: 16px }
+.longWrap { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; width: 100% }
+.longWrap textarea { resize: vertical; min-height: 96px }
+.longWrap span { font-size: 12px }
+.recap { width: 100%; margin: 6px 0 0; padding: 0; list-style: none }
+.recap button { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; width: 100%; padding: 9px 0; border-top: 1px solid var(--border); text-align: left; font-size: 13.5px; color: var(--text-2) }
+.recap li:first-child button { border-top: 0 }
+.recap button:hover { color: var(--text) }
+.applyNav { display: flex; justify-content: space-between; gap: 10px; margin-top: 8px }
+.applyNav :global(.btn) { min-width: 110px }
+.enterHint { margin: 8px 0 0; text-align: right; font-size: 12px }
+@media (max-width: 48rem) {
+  .enterHint { display: none }
+  .ask { min-height: 0 }
+}
