@@ -148,7 +148,7 @@ export function Team() {
       <div className={s.team} data-reveal-group>
         {MEMBERS.map((m) => (
           <div key={m} className={`${s.member} ${s.panel}`}>
-            <Hoodie member={m} size={96} mood={m === "sniper" ? "suspicious" : m === "research" ? "searching" : m === "trader" ? "working" : m === "launch" ? "happy" : "idle"} />
+            <Hoodie member={m} size={84} mood={m === "shield" ? "suspicious" : m === "sniper" ? "suspicious" : m === "research" ? "searching" : m === "trader" ? "working" : m === "launch" ? "happy" : "idle"} />
             <h3>{TEAM[m].name}</h3>
             <p>{TEAM[m].job}</p>
           </div>
