@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { Hoodie } from "@/components/Hoodie";
 import { Logo } from "@/components/Logo";
+import { SpecList } from "@/components/SpecList";
 import { MEMBERS, TEAM } from "@/lib/team";
 
 import s from "./landing.module.css";
@@ -91,26 +92,35 @@ export function Strategies() {
     <section id="strategies" className={s.section}>
       <div className={s.split}>
         <div className={`${s.panel} ${s.strategy}`} data-reveal>
-          <dl style={{ margin: 0 }}>
-            <div className={s.row}><dt>Watch</dt><dd><span className={s.pill}>New Pons launches</span></dd></div>
-            <div className={s.row}>
-              <dt>Filters</dt>
-              <dd>
-                <span className={s.pill}>mcap ≤ $60k</span>
-                <span className={s.pill}>liquidity ≥ $5k</span>
-                <span className={s.pill}>curve 5–60%</span>
-                <span className={s.pill}>age ≤ 2h</span>
-                <span className={s.pill}>size 0.01 ETH</span>
-                <span className={s.pill}>slippage 3%</span>
-              </dd>
+          <div className={s.block}>
+            <span className={s.blockLabel}>Watch</span>
+            <p className={s.watch}>New Pons launches</p>
+          </div>
+          <div className={s.block}>
+            <span className={s.blockLabel}>Filters</span>
+            <SpecList rows={[["Market cap", "up to $60k"], ["Liquidity", "$5k or more"], ["Curve", "5% to 60%"], ["Age", "under 2h"]]} />
+          </div>
+          <div className={s.block}>
+            <span className={s.blockLabel}>Must pass</span>
+            <SpecList rows={[["ResearchBot read", "passes"], ["Buys vs sells, 1h", "2x or more"]]} />
+          </div>
+          <div className={s.pair}>
+            <div className={s.block}>
+              <span className={s.blockLabel}>Size</span>
+              <SpecList rows={[["Per entry", "0.01 ETH"], ["Slippage", "3%"]]} />
             </div>
-            <div className={s.row}><dt>Must pass</dt><dd><span className={s.pill}>ResearchBot read</span><span className={s.pill}>buys &gt; sells, 1h</span></dd></div>
-            <div className={s.row}><dt>Exit</dt><dd><span className={s.pill}>take profit +80%</span><span className={s.pill}>stop −35%</span></dd></div>
-            <div className={s.row}>
-              <dt>On a match</dt>
-              <dd><span className={s.seg}><span aria-current="true">Ask before each trade</span><span>Trade automatically</span></span></dd>
+            <div className={s.block}>
+              <span className={s.blockLabel}>Exit</span>
+              <SpecList rows={[["Take profit", "+80%", "up"], ["Stop loss", "-35%", "down"]]} />
             </div>
-          </dl>
+          </div>
+          <div className={s.block}>
+            <span className={s.blockLabel}>On a match</span>
+            <div className={s.seg} role="img" aria-label="Ask before each trade is selected">
+              <span aria-current="true">Ask before each trade</span>
+              <span>Trade automatically</span>
+            </div>
+          </div>
         </div>
         <div>
           <div className={s.sectionHead} data-reveal>

@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { Hoodie } from "@/components/Hoodie";
+import { SpecList } from "@/components/SpecList";
 import { StatusButton } from "@/components/ui/StatusButton";
 import { addressUrl, txUrl } from "@/lib/chain/robinhood-urls";
 
@@ -147,7 +148,7 @@ export function Strategies({ snap, onChange }: { snap: Snapshot; onChange: () =>
             <button type="button" className="btn" onClick={() => api.strategy(st.id, { active: !st.active }).then(onChange)}>{st.active ? "Pause" : "Resume"}</button>
           </div>
           <p className="faint" style={{ margin: "2px 0 8px", fontSize: 13 }}>{st.watching}</p>
-          <div className={s.pills}>{st.rules.map((r) => <span key={r} className={s.pill}>{r}</span>)}</div>
+          <div className={s.rules}><SpecList rows={st.rules} compact /></div>
           <div className={s.seg} role="group" aria-label="When it matches">
             {(["ask", "auto"] as const).map((m) => (
               <button key={m} type="button" aria-pressed={st.mode === m} onClick={() => st.mode !== m && api.strategy(st.id, { mode: m }).then(onChange)}>
