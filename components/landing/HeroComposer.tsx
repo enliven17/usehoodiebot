@@ -27,6 +27,7 @@ export function HeroComposer() {
       <form
         id="composer"
         className={s.composer}
+        data-intro
         onSubmit={(e) => {
           e.preventDefault();
           go(text);
@@ -59,7 +60,7 @@ export function HeroComposer() {
           </button>
         </div>
       </form>
-      <ul className={s.chips}>
+      <ul className={s.chips} data-intro>
         {CHIPS.map(([k, q]) => (
           <li key={k}>
             <button type="button" className="chip" onClick={() => go(q)}>

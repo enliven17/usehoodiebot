@@ -6,15 +6,17 @@ import { MEMBERS, TEAM } from "@/lib/team";
 
 import s from "./landing.module.css";
 
-export function Nav() {
+/** `home` keeps section links as in-page anchors (Lenis scrolls to them); elsewhere they lead back to the landing page. */
+export function Nav({ home = false }: { home?: boolean }) {
+  const at = (id: string) => (home ? `#${id}` : `/#${id}`);
   return (
     <header className={s.nav}>
       <Link href="/" className={s.brand} aria-label="HOODIEBOT home"><Logo /></Link>
       <nav className={s.links} aria-label="Sections">
-        <a href="#product">Product</a>
-        <a href="#strategies">Strategies</a>
-        <a href="#team">The team</a>
-        <a href="#wallet">Wallet</a>
+        <a href={at("product")}>Product</a>
+        <a href={at("strategies")}>Strategies</a>
+        <a href={at("team")}>The team</a>
+        <a href={at("wallet")}>Wallet</a>
         <Link href="/litepaper">Litepaper</Link>
       </nav>
       <div className={s.navEnd}>
@@ -30,14 +32,14 @@ export function Product() {
     <section id="product" className={s.section}>
       <div className={s.split}>
         <div>
-          <div className={s.sectionHead}>
+          <div className={s.sectionHead} data-reveal>
             <h2 className={s.h2}>One message. The whole team moves.</h2>
             <p className={s.sub}>
               Tell HOODIEBOT what you want done in plain words. It sends the work to the right specialist, keeps what they find, and
               only brings you in when a trade needs your yes.
             </p>
           </div>
-          <ul className={s.points}>
+          <ul className={s.points} data-reveal-group>
             <li>
               <h3>Research that is reused</h3>
               <p>ResearchBot reads curve progress, liquidity, market cap and the last hour of buys and sells. TraderBot trades off that read instead of starting over.</p>
@@ -48,7 +50,7 @@ export function Product() {
             </li>
           </ul>
         </div>
-        <div className={s.panel} role="img" aria-label="An example conversation with HOODIEBOT">
+        <div className={s.panel} role="img" aria-label="An example conversation with HOODIEBOT" data-reveal>
           <div className={s.thread}>
             <div className={`${s.msg} ${s.msgMe}`}>
               <div className={s.bubble}>Find me something fresh on Pons with real buyers. 0.02 ETH max.</div>
@@ -88,7 +90,7 @@ export function Strategies() {
   return (
     <section id="strategies" className={s.section}>
       <div className={s.split}>
-        <div className={`${s.panel} ${s.strategy}`}>
+        <div className={`${s.panel} ${s.strategy}`} data-reveal>
           <dl style={{ margin: 0 }}>
             <div className={s.row}><dt>Watch</dt><dd><span className={s.pill}>New Pons launches</span></dd></div>
             <div className={s.row}>
@@ -111,11 +113,11 @@ export function Strategies() {
           </dl>
         </div>
         <div>
-          <div className={s.sectionHead}>
+          <div className={s.sectionHead} data-reveal>
             <h2 className={s.h2}>A Strategy is your rules, written once.</h2>
             <p className={s.sub}>Choose what to watch, what has to pass, and what happens when something matches. HOODIEBOT checks the market every minute.</p>
           </div>
-          <ul className={s.points}>
+          <ul className={s.points} data-reveal-group>
             <li><h3>Cover more of the market</h3><p>Every new Pons launch and every graduated pool, read while you are away.</p></li>
             <li><h3>Keep your rules consistent</h3><p>The same filters on the hundredth token as on the first. No chasing.</p></li>
             <li><h3>Skip the repetitive work</h3><p>Write it in a sentence. HOODIEBOT turns it into a Strategy you can read and edit.</p></li>
@@ -129,11 +131,11 @@ export function Strategies() {
 export function Team() {
   return (
     <section id="team" className={s.section}>
-      <div className={s.sectionHead}>
+      <div className={s.sectionHead} data-reveal>
         <h2 className={s.h2}>Five specialists. One hood.</h2>
         <p className={s.sub}>They share what they find, so nothing is read twice.</p>
       </div>
-      <div className={s.team}>
+      <div className={s.team} data-reveal-group>
         {MEMBERS.map((m) => (
           <div key={m} className={`${s.member} ${s.panel}`}>
             <Hoodie member={m} size={96} mood={m === "sniper" ? "suspicious" : m === "research" ? "searching" : m === "trader" ? "working" : m === "launch" ? "happy" : "idle"} />
@@ -149,11 +151,11 @@ export function Team() {
 export function Wallet() {
   return (
     <section id="wallet" className={s.section}>
-      <div className={s.sectionHead}>
+      <div className={s.sectionHead} data-reveal>
         <h2 className={s.h2}>Its own wallet, on a short leash.</h2>
         <p className={s.sub}>Your team trades from a server wallet made for it alone. You fund it, you set the size, and you can take it all back.</p>
       </div>
-      <div className={s.rules}>
+      <div className={s.rules} data-reveal-group>
         <div className={`${s.rule} ${s.panel}`}>
           <h3>Deny by default</h3>
           <p>The wallet&apos;s signing policy allows Pons curves, the Uniswap v4 router and Permit2 on chain <code>4663</code>. Anything else is refused before it is signed.</p>
@@ -174,11 +176,11 @@ export function Wallet() {
 export function Venues() {
   return (
     <section className={s.section}>
-      <div className={s.sectionHead}>
+      <div className={s.sectionHead} data-reveal>
         <h2 className={s.h2}>Where it trades</h2>
         <p className={s.sub}>Robinhood Chain mainnet. Tokens on their Pons bonding curve, and on Uniswap v4 once they graduate.</p>
       </div>
-      <div className={s.venues}>
+      <div className={s.venues} data-reveal-group>
         {["Robinhood Chain", "Pons", "Uniswap v4", "GeckoTerminal", "Blockscout"].map((v) => <span key={v} className="chip">{v}</span>)}
       </div>
     </section>
@@ -188,7 +190,7 @@ export function Venues() {
 export function Closing() {
   return (
     <section className={s.section}>
-      <div className={`${s.panel} ${s.closing}`}>
+      <div className={`${s.panel} ${s.closing}`} data-reveal>
         <Hoodie size={120} mood="happy" />
         <h2 className={s.h2}>Put your team to work.</h2>
         <Link className="btn btn-primary btn-lg" href="/app">Open HOODIEBOT</Link>
