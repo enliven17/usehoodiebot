@@ -1,0 +1,8 @@
+/* A slow breath: rise, a little squash at the top of it, settle. Transform-origin at the base so it sits on its hem. */
+.hoodie { display: inline-flex; flex: none; transform-origin: 50% 92%; animation: breathe 4.2s cubic-bezier(.45, 0, .55, 1) var(--hoodie-delay, 0s) infinite }
+@keyframes breathe {
+  0%, 100% { transform: translateY(0) scale(1, 1) }
+  45% { transform: translateY(-4%) scale(.985, 1.025) }
+  60% { transform: translateY(-4.4%) scale(1.01, .995) }
+}
+@media (prefers-reduced-motion: reduce) { .hoodie { animation: none } }
