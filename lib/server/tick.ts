@@ -7,6 +7,7 @@ import { candidates, type Candidate } from "../chain/market";
 import { api, mutate, query } from "../db";
 import { exitReason, parseSpec, rejects, type Spec } from "../strategy";
 import { safeMessage } from "./errors";
+import { eth, fillEvent, logEvent } from "./events";
 import { APPROVAL_TTL_MS, getExecutor, getTeam, propose, SentTrade, trade, tradeNow, type Team } from "./team";
 
 type Strategy = { id: string; owner: string; name: string; spec: unknown; mode: "ask" | "auto" };
@@ -41,8 +42,10 @@ async function enter(s: Strategy, spec: Spec, market: Candidate[]) {
     if (!(await mutate(api.strategies.match, { strategyId: sid, token: c.token }))) continue;
     const wei = parseEther(String(spec.sizeEth));
     const why = `${s.name}: ${c.symbol} matched${c.curvePct !== undefined ? `, ${c.curvePct.toFixed(1)}% up its curve` : ""}${c.mcapUsd !== undefined ? `, $${Math.round(c.mcapUsd).toLocaleString("en-US")} market cap` : ""}.`;
+    await logEvent(s.owner, { member: "sniper", kind: "match", text: why, token: c.token, symbol: c.symbol });
     if (s.mode === "ask") {
       await propose(s.owner, { kind: "buy", token: c.token, symbol: c.symbol, amount: wei, reason: why, strategyId: s.id });
+      await logEvent(s.owner, { member: "trader", kind: "ask", text: `Asked you to approve a ${eth(wei)} buy of ${c.symbol}.`, token: c.token, symbol: c.symbol });
       return [`${s.id}: asked to buy ${c.symbol}`];
     }
     const f = await auto((await getTeam(s.owner))!, { kind: "buy", token: c.token, symbol: c.symbol, amount: wei, slippageBps: spec.slippageBps, strategyId: s.id }, why);
@@ -64,6 +67,7 @@ async function exit(s: Strategy, spec: Spec) {
     const why = price === undefined ? null : exitReason(spec, entry, price);
     if (!why) continue;
     const reason = `${s.name}: ${p.symbol} hit ${why} (${((price! / entry - 1) * 100).toFixed(0)}%).`;
+    await logEvent(s.owner, { member: "sniper", kind: "exit", text: reason, token: p.token, symbol: p.symbol });
     if (s.mode === "ask") {
       const pending = await query(api.approvals.pending, { owner: s.owner });
       if (!pending.some((a) => a.token === p.token && a.kind === "sell")) await propose(s.owner, { kind: "sell", token: p.token, symbol: p.symbol, amount: 0n, reason, strategyId: s.id });
@@ -79,9 +83,15 @@ async function exit(s: Strategy, spec: Spec) {
 /** An automatic trade. A send that is not confirmed in time is recorded as "sent" for settle(). Null when the wallet is busy. */
 async function auto(team: Team, a: Parameters<typeof trade>[1], reason: string): Promise<string | null> {
   try {
-    return (await tradeNow(team, a))?.hash ?? null;
+    const f = await tradeNow(team, a);
+    if (f) await logEvent(team.owner, fillEvent(a.kind, a.symbol, a.token, f, "automatically"));
+    return f?.hash ?? null;
   } catch (err) {
-    if (!(err instanceof SentTrade)) throw err;
+    if (!(err instanceof SentTrade)) {
+      await logEvent(team.owner, { member: "trader", kind: "fail", text: `Could not ${a.kind} ${a.symbol}: ${safeMessage(err)}`, token: a.token, symbol: a.symbol });
+      throw err;
+    }
+    await logEvent(team.owner, { member: "trader", kind: "sent", text: `Sent a ${a.kind} of ${a.symbol}; waiting for the chain to confirm it.`, token: a.token, symbol: a.symbol, hash: err.hash });
     await mutate(api.approvals.recordSent, { owner: team.owner, strategyId: (a.strategyId ?? undefined) as Id<"strategies"> | undefined, kind: a.kind, token: a.token, symbol: a.symbol, amount: a.amount.toString(), reason, hash: err.hash });
     return `${err.hash} (sent, settling)`;
   }
@@ -108,7 +118,9 @@ async function settle() {
       await mutate(api.book.sold, { owner: a.owner, token: a.token, symbol: a.symbol, tokens: fill.tokens.toString(), wei: fill.wei.toString(), hash, closes: held === 0n });
       await mutate(api.approvals.finish, { id, status: "done", result: { hash, wei: fill.wei.toString(), tokens: fill.tokens.toString() } });
     }
+    if (fill !== "reverted") await logEvent(a.owner, fillEvent(a.kind, a.symbol, a.token, fill, "once it confirmed"));
     out.push(`settled ${a.kind} ${a.symbol} ${hash}`);
   }
   return out;
 }
+

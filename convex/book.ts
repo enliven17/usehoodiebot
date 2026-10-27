@@ -48,6 +48,16 @@ export const sold = mutation({
   },
 });
 
+/** Closed positions, newest first: realized profit and loss. */
+export const closed = query({
+  args: { secret, owner: v.string() },
+  handler: async (ctx, a) => {
+    guard(a.secret);
+    const rows = await ctx.db.query("positions").withIndex("by_owner_open", (q) => q.eq("owner", a.owner).gt("closedAt", 0)).collect();
+    return rows.map((p) => ({ symbol: p.symbol, costWei: p.costWei, proceedsWei: p.proceedsWei ?? "0", closedAt: p.closedAt! }));
+  },
+});
+
 export const trades = query({
   args: { secret, owner: v.string() },
   handler: async (ctx, a) => {

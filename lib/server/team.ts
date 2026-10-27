@@ -10,6 +10,7 @@ import { robinhoodAgentPolicy } from "../chain/policy";
 import { getPrivy } from "../chain/privy";
 import { api, mutate, query } from "../db";
 import { safeMessage } from "./errors";
+import { fillEvent, logEvent } from "./events";
 
 export type Team = { owner: Address; wallet: Address; walletId: string };
 export type Approval = Awaited<ReturnType<typeof propose>>;
@@ -87,14 +88,19 @@ export const propose = (owner: string, a: { kind: "buy" | "sell"; token: string;
 export async function decide(owner: string, id: string, yes: boolean, slippageBps = 300): Promise<Approval> {
   const claimed = await mutate(api.approvals.claim, { owner, id, approve: yes, ttlMs: APPROVAL_TTL_MS });
   if (!claimed) throw new Error("This approval is no longer open.");
-  if (!yes) return claimed;
+  if (!yes) {
+    await logEvent(owner, { member: "hoodiebot", kind: "skip", text: `You skipped the ${claimed.kind} of ${claimed.symbol}.`, token: claimed.token, symbol: claimed.symbol });
+    return claimed;
+  }
   const team = (await getTeam(owner))!;
   const outcome = await withLease(owner, async () => {
     try {
       const f = await trade(team, { kind: claimed.kind, token: claimed.token, symbol: claimed.symbol, amount: BigInt(claimed.amount), slippageBps, strategyId: claimed.strategyId });
+      await logEvent(owner, fillEvent(claimed.kind, claimed.symbol, claimed.token, f, "after your approval"));
       return { status: "done" as const, result: { hash: f.hash, wei: f.wei.toString(), tokens: f.tokens.toString() } };
     } catch (err) {
       if (err instanceof SentTrade) return { status: "sent" as const, result: { hash: err.hash, error: err.message } };
+      await logEvent(owner, { member: "trader", kind: "fail", text: `Could not ${claimed.kind} ${claimed.symbol}: ${safeMessage(err)}`, token: claimed.token, symbol: claimed.symbol });
       return { status: "failed" as const, result: { error: safeMessage(err) } };
     }
   });

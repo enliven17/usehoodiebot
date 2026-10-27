@@ -10,6 +10,7 @@ import { api, mutate, query } from "../db";
 import { describe, parseSpec, SPEC_LIMITS, WATCH_LABEL } from "../strategy";
 import type { Member } from "../team";
 import { safeMessage } from "./errors";
+import { logEvent, type TeamEvent } from "./events";
 import type { ToolDef } from "./llm";
 import { getExecutor, normalizeToken, propose, type Team } from "./team";
 
@@ -141,10 +142,37 @@ export async function runTool(team: Team, name: string, input: unknown): Promise
   const tool = TOOLS.find((t) => t.name === name);
   if (!tool) return { content: `Unknown tool ${name}`, isError: true };
   try {
-    const out = await tool.run(team, (input && typeof input === "object" ? input : {}) as Record<string, unknown>);
+    const args = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
+    const out = await tool.run(team, args);
     const isError = !!out && typeof out === "object" && "error" in out;
+    const event = isError ? null : timeline(name, args, out);
+    if (event) await logEvent(team.owner, event);
     return { content: JSON.stringify(out), isError };
   } catch (err) {
     return { content: `Failed: ${safeMessage(err)}`, isError: true };
+  }
+}
+
+/** The decisions worth a line on the timeline; reads (wallet, strategy list) are left out. */
+function timeline(name: string, args: Record<string, unknown>, out: unknown): TeamEvent | null {
+  const o = (out ?? {}) as Record<string, unknown>;
+  const symbol = typeof args.symbol === "string" ? args.symbol.slice(0, 24) : undefined;
+  const token = typeof args.token === "string" ? args.token : undefined;
+  switch (name) {
+    case "scan_market":
+      return Array.isArray(out) ? { member: "research", kind: "scan", text: `Scanned ${out.length} Pons tokens.` } : null;
+    case "research_token": {
+      const m = o.market as { symbol?: string; curvePct?: number | null; liquidityUsd?: number | null } | null;
+      const what = m ? `${m.symbol}: ${m.curvePct ?? "?"}% up its curve, $${(m.liquidityUsd ?? 0).toLocaleString("en-US")} liquidity` : "a token that is not listed yet";
+      return { member: "research", kind: "research", text: `Read ${what}, on ${String(o.tradesOn ?? "Pons")}.`, token: String(o.token ?? token ?? ""), symbol: m?.symbol };
+    }
+    case "propose_trade":
+      return { member: "trader", kind: "ask", text: `Put a ${args.kind === "sell" ? "sell" : `${args.ethAmount} ETH buy`} of ${symbol} up for your approval: ${String(args.reason ?? "").slice(0, 160)}`, token, symbol };
+    case "create_strategy":
+      return { member: "sniper", kind: "strategy", text: `Saved the strategy "${String(args.name ?? "").slice(0, 60)}", watching ${String(o.watching ?? "Pons")}.` };
+    case "update_strategy":
+      return { member: "sniper", kind: "strategy", text: args.active ? "Resumed a strategy." : "Paused a strategy." };
+    default:
+      return null;
   }
 }

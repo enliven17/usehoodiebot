@@ -66,6 +66,19 @@ export default defineSchema({
     .index("by_owner_open", ["owner", "closedAt"])
     .index("by_strategy_open", ["strategyId", "closedAt"]),
 
+  /** What the team decided and did, newest first in the app: matches, research, asks, fills, exits, skips. */
+  events: defineTable({
+    owner: v.string(),
+    member: v.union(v.literal("hoodiebot"), v.literal("research"), v.literal("sniper"), v.literal("trader"), v.literal("launch")),
+    kind: v.string(),
+    text: v.string(),
+    token: v.optional(v.string()),
+    symbol: v.optional(v.string()),
+    hash: v.optional(v.string()),
+    /** ETH moved, signed: negative when it left the wallet (a buy), positive when it came back (a sell). */
+    wei: v.optional(v.string()),
+  }).index("by_owner", ["owner"]),
+
   trades: defineTable({
     owner: v.string(),
     side: v.union(v.literal("buy"), v.literal("sell")),
