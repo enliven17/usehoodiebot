@@ -16,6 +16,11 @@ export default defineSchema({
     thread: v.number(),
     /** The highest thread number used: an older chat can be reopened, a new one always goes past this. */
     lastThread: v.optional(v.number()),
+    /**
+     * The owner's go-ahead for trading without asking: off by default. Strategies set to "auto" only trade on their own
+     * while it is on, and only while what they hold stays within budgetEth; otherwise they ask, like "ask" strategies.
+     */
+    autopilot: v.optional(v.object({ on: v.boolean(), budgetEth: v.number(), since: v.number() })),
   }).index("by_owner", ["owner"]),
 
   /** Each chat message as JSON text (OpenAI-style: user, assistant with tool calls, tool results). */

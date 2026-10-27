@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { Id } from "@/convex/_generated/dataModel";
-import { parseEther } from "viem";
+import { formatEther, parseEther } from "viem";
 
 import { candidates, type Candidate } from "../chain/market";
 import { shield, shieldLine } from "../chain/shield";
@@ -61,16 +61,28 @@ async function enter(s: Strategy, spec: Spec, market: Candidate[]) {
     const wei = parseEther(String(sizeFor(spec, safety.score)));
     const why = `${s.name}: ${c.symbol} matched${c.curvePct !== undefined ? `, ${c.curvePct.toFixed(1)}% up its curve` : ""}${c.mcapUsd !== undefined ? `, $${Math.round(c.mcapUsd).toLocaleString("en-US")} market cap` : ""}. ${shieldLine(safety)}`;
     await logEvent(s.owner, { member: "sniper", kind: "match", text: why, token: c.token, symbol: c.symbol });
-    if (s.mode === "ask") {
-      await propose(s.owner, { kind: "buy", token: c.token, symbol: c.symbol, amount: wei, reason: why, strategyId: s.id });
-      await logEvent(s.owner, { member: "trader", kind: "ask", text: `Asked you to approve a ${eth(wei)} buy of ${c.symbol}.`, token: c.token, symbol: c.symbol });
+    const team = (await getTeam(s.owner))!;
+    // "auto" trades on its own only under Autopilot, and only inside its budget; anything else asks the owner
+    const held = s.mode === "auto" && team.autopilot.on ? await autoDeployed(s.owner) : 0;
+    const overBudget = held + Number(formatEther(wei)) > team.autopilot.budgetEth;
+    if (s.mode === "ask" || !team.autopilot.on || overBudget) {
+      const note = s.mode === "auto" ? (!team.autopilot.on ? " Autopilot is off, so it asks first." : ` That would take Autopilot past its ${team.autopilot.budgetEth} ETH budget, so it asks first.`) : "";
+      await propose(s.owner, { kind: "buy", token: c.token, symbol: c.symbol, amount: wei, reason: `${why}${note}`, strategyId: s.id });
+      await logEvent(s.owner, { member: "trader", kind: "ask", text: `Asked you to approve a ${eth(wei)} buy of ${c.symbol}.${note}`, token: c.token, symbol: c.symbol });
       return [`${s.id}: asked to buy ${c.symbol}`];
     }
-    const f = await auto((await getTeam(s.owner))!, { kind: "buy", token: c.token, symbol: c.symbol, amount: wei, slippageBps: spec.slippageBps, strategyId: s.id }, why);
+    const f = await auto(team, { kind: "buy", token: c.token, symbol: c.symbol, amount: wei, slippageBps: spec.slippageBps, strategyId: s.id }, why);
     if (!f) await mutate(api.strategies.unmatch, { strategyId: sid, token: c.token }); // wallet busy: try it again next tick
     return [`${s.id}: ${f ? `bought ${c.symbol} ${f}` : "wallet busy"}`];
   }
   return [];
+}
+
+/** ETH the owner's automatic strategies have in open positions right now, at cost: what counts against the budget. */
+export async function autoDeployed(owner: string): Promise<number> {
+  const [open, strategies] = await Promise.all([query(api.book.open, { owner }), query(api.strategies.byOwner, { owner })]);
+  const auto = new Set(strategies.filter((x) => x.mode === "auto").map((x) => x.id));
+  return open.filter((p) => p.strategyId && auto.has(p.strategyId)).reduce((t, p) => t + Number(formatEther(BigInt(p.costWei))), 0);
 }
 
 /** Records a new high for each position whose price beat it; returns the high to measure a trailing stop from. */

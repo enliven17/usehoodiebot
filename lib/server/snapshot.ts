@@ -4,7 +4,11 @@ import { formatEther } from "viem";
 
 import { api, query } from "../db";
 import { parseSpec, ruleRows, WATCH_LABEL } from "../strategy";
+import { MEMBERS, type Member } from "../team";
 import { getExecutor, type Team } from "./team";
+import { autoDeployed } from "./tick";
+
+const DAY_MS = 24 * 3600_000;
 
 /** Everything the side panels of the app show, in one call. */
 export async function snapshot(team: Team) {
@@ -15,10 +19,19 @@ export async function snapshot(team: Team) {
     query(api.strategies.byOwner, { owner }),
     query(api.approvals.recent, { owner }),
     query(api.book.trades, { owner }),
-    query(api.events.recent, { owner, limit: 40 }),
+    query(api.events.recent, { owner, limit: 100 }),
     query(api.book.closed, { owner }),
   ]);
-  const [balance, prices] = await Promise.all([ex.spendable(team.wallet).catch(() => null), ex.prices(open.map((p) => p.token)).catch(() => new Map<string, number>())]);
+  const [balance, prices, deployedEth] = await Promise.all([ex.spendable(team.wallet).catch(() => null), ex.prices(open.map((p) => p.token)).catch(() => new Map<string, number>()), autoDeployed(owner).catch(() => 0)]);
+  // what each specialist did last, and how much of it in the last day
+  const day = events.filter((e) => e.at > Date.now() - DAY_MS);
+  const agents = Object.fromEntries(
+    MEMBERS.map((m) => {
+      const mine = events.filter((e) => e.member === m);
+      const kinds = day.filter((e) => e.member === m).reduce<Record<string, number>>((t, e) => ({ ...t, [e.kind]: (t[e.kind] ?? 0) + 1 }), {});
+      return [m, { last: mine[0] ? { text: mine[0].text, at: mine[0].at } : null, today: kinds }];
+    }),
+  ) as Record<Member, { last: { text: string; at: number } | null; today: Record<string, number> }>;
   const positions = open.map((p) => {
     const price = prices.get(p.token);
     return { id: p.id, token: p.token, symbol: p.symbol, costEth: Number(formatEther(BigInt(p.costWei))), valueEth: price === undefined ? null : (Number(p.tokens) / 1e18) * price, openedAt: p.openedAt };
@@ -32,7 +45,9 @@ export async function snapshot(team: Team) {
     spendableEth: balance === null ? null : formatEther(balance),
     positions,
     pnl: { realizedEth, unrealizedEth, closedCount: closed.length },
-    events,
+    events: events.slice(0, 40),
+    agents,
+    autopilot: { ...team.autopilot, deployedEth },
     strategies: strategies.map((s) => ({ id: s.id, name: s.name, mode: s.mode, active: s.active, watching: WATCH_LABEL[parseSpec(s.spec).watch], rules: ruleRows(parseSpec(s.spec)) })),
     approvals: approvals.map((a) => ({ id: a.id, kind: a.kind, token: a.token, symbol: a.symbol, eth: a.kind === "buy" ? formatEther(BigInt(a.amount)) : null, reason: a.reason, status: a.status, result: a.result as { hash?: string; error?: string } | null, createdAt: a.createdAt })),
     trades: trades.map((t) => ({ side: t.side, symbol: t.symbol, eth: formatEther(BigInt(t.wei)), hash: t.hash, at: t.at })),

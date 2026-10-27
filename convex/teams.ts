@@ -48,6 +48,18 @@ export const release = mutation({
   },
 });
 
+/** Turns Autopilot on or off and sets its budget. */
+export const setAutopilot = mutation({
+  args: { secret, owner: v.string(), on: v.boolean(), budgetEth: v.number() },
+  handler: async (ctx, a) => {
+    guard(a.secret);
+    const t = await byOwner(ctx.db, a.owner);
+    if (!t) return false;
+    await ctx.db.patch(t._id, { autopilot: { on: a.on, budgetEth: a.budgetEth, since: Date.now() } });
+    return true;
+  },
+});
+
 /** Every team, for maintenance scripts (policy upgrades). */
 export const all = query({
   args: { secret },
