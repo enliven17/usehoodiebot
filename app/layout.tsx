@@ -1,8 +1,27 @@
+import type { Metadata, Viewport } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
 import type { ReactNode } from "react";
+
+import "./globals.css";
+
+const sans = Geist({ subsets: ["latin"], variable: "--font-geist", weight: ["300", "400", "500", "600"] });
+const mono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono", weight: ["400", "500"] });
+
+const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://usehoodiebot.com";
+
+export const metadata: Metadata = {
+  metadataBase: new URL(SITE),
+  title: { default: "HOODIEBOT", template: "%s · HOODIEBOT" },
+  description: "Your private trading team on Robinhood Chain. Tell HOODIEBOT what to watch; its specialists research, wait for the entry and trade inside your rules.",
+  openGraph: { siteName: "HOODIEBOT", type: "website" },
+  twitter: { card: "summary_large_image", site: "@usehoodiebot" },
+};
+
+export const viewport: Viewport = { themeColor: "#04060a", colorScheme: "dark" };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${sans.variable} ${mono.variable}`}>
       <body>{children}</body>
     </html>
   );
