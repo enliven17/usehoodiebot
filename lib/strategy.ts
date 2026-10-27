@@ -19,12 +19,13 @@ export type Spec = {
   stopLossPct?: number;
 };
 
-export const SPEC_LIMITS = { sizeEth: [0.0005, 1], slippageBps: [50, 1500], maxOpen: [1, 10] } as const;
+export const SPEC_LIMITS = { sizeEth: [0.0005, 1], slippageBps: [50, 1500], maxOpen: [1, 10], exitPct: [5, 1000] } as const;
 const NEW_MINUTES = 120;
 
 const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
 const pos = (v: unknown) => { const n = num(v); return n !== undefined && n >= 0 ? n : undefined; };
 const clamp = (v: number, [lo, hi]: readonly [number, number]) => Math.min(hi, Math.max(lo, v));
+const exitPct = (v: unknown) => (pos(v) === undefined ? undefined : clamp(pos(v)!, SPEC_LIMITS.exitPct));
 
 /** Anything the model or a client sends becomes a safe Spec: unknown fields dropped, sizes clamped. */
 export function parseSpec(raw: unknown): Spec {
@@ -43,8 +44,9 @@ export function parseSpec(raw: unknown): Spec {
     maxCurvePct: pos(r.maxCurvePct),
     maxAgeMinutes: pos(r.maxAgeMinutes),
     minBuySellRatio: pos(r.minBuySellRatio),
-    takeProfitPct: pos(r.takeProfitPct),
-    stopLossPct: pos(r.stopLossPct) !== undefined ? Math.min(99, pos(r.stopLossPct)!) : undefined,
+    // At least 5% either way: a fresh position already reads about 2–3% down from the fees on the way in and out.
+    takeProfitPct: exitPct(r.takeProfitPct),
+    stopLossPct: exitPct(r.stopLossPct) !== undefined ? Math.min(99, exitPct(r.stopLossPct)!) : undefined,
   };
 }
 

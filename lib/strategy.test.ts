@@ -14,6 +14,8 @@ test("parseSpec clamps sizes and drops junk", () => {
   assert.equal(s.maxOpen, 1);
   assert.equal(s.maxMcapUsd, undefined);
   assert.ok(!("hack" in s));
+  assert.equal(parseSpec({ stopLossPct: 0, takeProfitPct: 1 }).stopLossPct, 5);
+  assert.equal(parseSpec({ stopLossPct: 0, takeProfitPct: 1 }).takeProfitPct, 5);
 });
 
 test("rejects: filters and missing data fail closed", () => {
