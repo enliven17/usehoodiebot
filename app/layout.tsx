@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE),
   title: { default: "HOODIEBOT", template: "%s · HOODIEBOT" },
   description: "Your private trading team on Robinhood Chain. Tell HOODIEBOT what to watch; its specialists research, wait for the entry and trade inside your rules.",
-  openGraph: { siteName: "HOODIEBOT", type: "website" },
+  openGraph: { siteName: "HOODIEBOT", type: "website", images: [{ url: "/og/home.png", width: 1200, height: 630, alt: "HOODIEBOT, your private trading team on Robinhood Chain" }] },
   twitter: { card: "summary_large_image", site: "@usehoodiebot" },
 };
 

@@ -4,7 +4,8 @@ import { Doc } from "@/components/doc/Doc";
 import { Hoodie } from "@/components/Hoodie";
 import { MEMBERS, TEAM } from "@/lib/team";
 
-export const metadata: Metadata = { title: "Litepaper", description: "How HOODIEBOT works: a private trading team for Pons tokens on Robinhood Chain." };
+const description = "How HOODIEBOT works: a private trading team for Pons tokens on Robinhood Chain.";
+export const metadata: Metadata = { title: "Litepaper", description, openGraph: { title: "HOODIEBOT Litepaper", description, images: [{ url: "/og/litepaper.png", width: 1200, height: 630 }] } };
 
 export default function Litepaper() {
   return (
