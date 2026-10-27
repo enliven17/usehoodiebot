@@ -32,15 +32,19 @@ export const bought = mutation({
   },
 });
 
-/** A sell; `closes` when it emptied the wallet of that token, which closes every open position in it. */
+/**
+ * A sell. It closes `positionId` when given (a strategy exit sells exactly that position), and every open position in
+ * the token when `closes` (the wallet holds none of it any more).
+ */
 export const sold = mutation({
-  args: { secret, owner: v.string(), token: v.string(), symbol: v.string(), tokens: v.string(), wei: v.string(), hash: v.string(), closes: v.boolean() },
+  args: { secret, owner: v.string(), token: v.string(), symbol: v.string(), tokens: v.string(), wei: v.string(), hash: v.string(), closes: v.boolean(), positionId: v.optional(v.string()) },
   handler: async (ctx, a) => {
     guard(a.secret);
     await ctx.db.insert("trades", { owner: a.owner, side: "sell", token: a.token, symbol: a.symbol, wei: a.wei, tokens: a.tokens, hash: a.hash });
-    if (!a.closes) return;
-    const open = await ctx.db.query("positions").withIndex("by_owner_open", (q) => q.eq("owner", a.owner).eq("closedAt", undefined)).collect();
-    for (const p of open.filter((p) => p.token === a.token)) await ctx.db.patch(p._id, { closedAt: Date.now(), proceedsWei: a.wei });
+    const open = (await ctx.db.query("positions").withIndex("by_owner_open", (q) => q.eq("owner", a.owner).eq("closedAt", undefined)).collect()).filter((p) => p.token === a.token);
+    for (const p of open) {
+      if (a.closes || p._id === a.positionId) await ctx.db.patch(p._id, { closedAt: Date.now(), proceedsWei: a.closes && p._id !== a.positionId ? "0" : a.wei });
+    }
   },
 });
 

@@ -3,10 +3,13 @@ import "server-only";
 import type { Id } from "@/convex/_generated/dataModel";
 import { formatEther, getAddress, isAddress, type Address } from "viem";
 
-import { createExecutor, type Executor } from "../chain/executor";
+import { randomUUID } from "node:crypto";
+
+import { createExecutor, isAmbiguousSend, type Executor } from "../chain/executor";
 import { robinhoodAgentPolicy } from "../chain/policy";
 import { getPrivy } from "../chain/privy";
 import { api, mutate, query } from "../db";
+import { safeMessage } from "./errors";
 
 export type Team = { owner: Address; wallet: Address; walletId: string };
 export type Approval = Awaited<ReturnType<typeof propose>>;
@@ -37,30 +40,43 @@ export async function ensureTeam(owner: Address): Promise<Team> {
 
 /** Runs `fn` holding the team's wallet lease, or returns null when another transaction is in flight. */
 async function withLease<T>(owner: string, fn: () => Promise<T>): Promise<T | null> {
-  if (!(await mutate(api.teams.lease, { owner, seconds: LEASE_SECONDS }))) return null;
+  const token = randomUUID();
+  if (!(await mutate(api.teams.lease, { owner, seconds: LEASE_SECONDS, token }))) return null;
   try {
     return await fn();
   } finally {
-    await mutate(api.teams.release, { owner });
+    await mutate(api.teams.release, { owner, token });
   }
 }
 
-/** Buy `amount` wei of a token, or sell `amount` tokens of it (0 = all held). Books the fill from the receipt. */
-export async function trade(team: Team, a: { kind: "buy" | "sell"; token: string; symbol: string; amount: bigint; slippageBps: number; strategyId: string | null }) {
+/** A trade that was broadcast but not confirmed in time. It may still land: track it as "sent", never as failed. */
+export class SentTrade extends Error {
+  constructor(readonly hash: string) {
+    super(`Sent but not confirmed yet: ${hash}. Check it on the explorer before trying again.`);
+  }
+}
+
+/**
+ * Buy `amount` wei of a token, or sell `amount` tokens of it (0 = all held; `positionId` = the position this sell
+ * closes). Books the fill from the receipt. Throws SentTrade when the send is ambiguous.
+ */
+export async function trade(team: Team, a: { kind: "buy" | "sell"; token: string; symbol: string; amount: bigint; slippageBps: number; strategyId: string | null; positionId?: string }) {
   const ex = getExecutor();
-  const base = { walletId: team.walletId, wallet: team.wallet, token: a.token, slippageBps: a.slippageBps };
+  let hash: string | null = null;
+  const base = { walletId: team.walletId, wallet: team.wallet, token: a.token, slippageBps: a.slippageBps, onSigned: async (h: string) => void (hash = h) };
+  const sent = (err: unknown) => Promise.reject(isAmbiguousSend(err) && hash ? new SentTrade(hash) : err);
   if (a.kind === "buy") {
     const spendable = await ex.spendable(team.wallet);
     if (spendable < a.amount) throw new Error(`The wallet has ${formatEther(spendable)} ETH to trade; this needs ${formatEther(a.amount)}.`);
-    const f = await ex.buy({ ...base, wei: a.amount });
+    const f = await ex.buy({ ...base, wei: a.amount }).catch(sent);
     await mutate(api.book.bought, { owner: team.owner, strategyId: strategyId(a.strategyId), token: a.token, symbol: a.symbol, tokens: f.tokens.toString(), wei: f.wei.toString(), hash: f.hash });
     return f;
   }
   const held = await ex.tokenBalance(team.wallet, a.token);
   const tokens = a.amount === 0n || held < a.amount ? held : a.amount;
   if (tokens === 0n) throw new Error(`The wallet holds no ${a.symbol}.`);
-  const f = await ex.sell({ ...base, tokens });
-  await mutate(api.book.sold, { owner: team.owner, token: a.token, symbol: a.symbol, tokens: f.tokens.toString(), wei: f.wei.toString(), hash: f.hash, closes: tokens === held });
+  const f = await ex.sell({ ...base, tokens }).catch(sent);
+  await mutate(api.book.sold, { owner: team.owner, token: a.token, symbol: a.symbol, tokens: f.tokens.toString(), wei: f.wei.toString(), hash: f.hash, closes: tokens === held, positionId: a.positionId });
   return f;
 }
 
@@ -78,7 +94,8 @@ export async function decide(owner: string, id: string, yes: boolean, slippageBp
       const f = await trade(team, { kind: claimed.kind, token: claimed.token, symbol: claimed.symbol, amount: BigInt(claimed.amount), slippageBps, strategyId: claimed.strategyId });
       return { status: "done" as const, result: { hash: f.hash, wei: f.wei.toString(), tokens: f.tokens.toString() } };
     } catch (err) {
-      return { status: "failed" as const, result: { error: err instanceof Error ? err.message.slice(0, 300) : String(err) } };
+      if (err instanceof SentTrade) return { status: "sent" as const, result: { hash: err.hash, error: err.message } };
+      return { status: "failed" as const, result: { error: safeMessage(err) } };
     }
   });
   const final = outcome ?? { status: "failed" as const, result: { error: "Another trade is in flight. Try again in a minute." } };

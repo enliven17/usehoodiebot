@@ -6,7 +6,8 @@ import { parseEther } from "viem";
 import { candidates, type Candidate } from "../chain/market";
 import { api, mutate, query } from "../db";
 import { exitReason, parseSpec, rejects, type Spec } from "../strategy";
-import { APPROVAL_TTL_MS, getExecutor, getTeam, propose, tradeNow } from "./team";
+import { safeMessage } from "./errors";
+import { APPROVAL_TTL_MS, getExecutor, getTeam, propose, SentTrade, trade, tradeNow, type Team } from "./team";
 
 type Strategy = { id: string; owner: string; name: string; spec: unknown; mode: "ask" | "auto" };
 
@@ -17,6 +18,7 @@ type Strategy = { id: string; owner: string; name: string; spec: unknown; mode: 
 export async function tick() {
   const log: string[] = [];
   await mutate(api.approvals.expire, { ttlMs: APPROVAL_TTL_MS });
+  log.push(...(await settle()));
   const strategies = await query(api.strategies.active, {});
   if (!strategies.length) return log;
   const market = await candidates();
@@ -25,7 +27,7 @@ export async function tick() {
     try {
       log.push(...(await enter(s, spec, market)), ...(await exit(s, spec)));
     } catch (err) {
-      log.push(`${s.id}: ${err instanceof Error ? err.message.slice(0, 160) : String(err)}`);
+      log.push(`${s.id}: ${safeMessage(err)}`);
     }
   }
   return log;
@@ -43,9 +45,9 @@ async function enter(s: Strategy, spec: Spec, market: Candidate[]) {
       await propose(s.owner, { kind: "buy", token: c.token, symbol: c.symbol, amount: wei, reason: why, strategyId: s.id });
       return [`${s.id}: asked to buy ${c.symbol}`];
     }
-    const f = await tradeNow((await getTeam(s.owner))!, { kind: "buy", token: c.token, symbol: c.symbol, amount: wei, slippageBps: spec.slippageBps, strategyId: s.id });
+    const f = await auto((await getTeam(s.owner))!, { kind: "buy", token: c.token, symbol: c.symbol, amount: wei, slippageBps: spec.slippageBps, strategyId: s.id }, why);
     if (!f) await mutate(api.strategies.unmatch, { strategyId: sid, token: c.token }); // wallet busy: try it again next tick
-    return [`${s.id}: ${f ? `bought ${c.symbol} ${f.hash}` : "wallet busy"}`];
+    return [`${s.id}: ${f ? `bought ${c.symbol} ${f}` : "wallet busy"}`];
   }
   return [];
 }
@@ -67,8 +69,46 @@ async function exit(s: Strategy, spec: Spec) {
       if (!pending.some((a) => a.token === p.token && a.kind === "sell")) await propose(s.owner, { kind: "sell", token: p.token, symbol: p.symbol, amount: 0n, reason, strategyId: s.id });
       continue;
     }
-    const f = await tradeNow((await getTeam(s.owner))!, { kind: "sell", token: p.token, symbol: p.symbol, amount: 0n, slippageBps: spec.slippageBps, strategyId: s.id });
+    // Sell exactly this position, so a manual buy of the same token stays put.
+    const f = await auto((await getTeam(s.owner))!, { kind: "sell", token: p.token, symbol: p.symbol, amount: BigInt(p.tokens), slippageBps: spec.slippageBps, strategyId: s.id, positionId: p.id }, reason);
     out.push(`${s.id}: ${f ? `sold ${p.symbol} (${why})` : "wallet busy"}`);
+  }
+  return out;
+}
+
+/** An automatic trade. A send that is not confirmed in time is recorded as "sent" for settle(). Null when the wallet is busy. */
+async function auto(team: Team, a: Parameters<typeof trade>[1], reason: string): Promise<string | null> {
+  try {
+    return (await tradeNow(team, a))?.hash ?? null;
+  } catch (err) {
+    if (!(err instanceof SentTrade)) throw err;
+    await mutate(api.approvals.recordSent, { owner: team.owner, strategyId: (a.strategyId ?? undefined) as Id<"strategies"> | undefined, kind: a.kind, token: a.token, symbol: a.symbol, amount: a.amount.toString(), reason, hash: err.hash });
+    return `${err.hash} (sent, settling)`;
+  }
+}
+
+/** Trades that were broadcast but not confirmed in time: book them from their receipts once they land. */
+async function settle() {
+  const ex = getExecutor();
+  const out: string[] = [];
+  for (const a of await query(api.approvals.sent, {})) {
+    const hash = (a.result as { hash?: string } | null)?.hash;
+    const team = hash ? await getTeam(a.owner) : null;
+    if (!hash || !team) continue;
+    const fill = await ex.settle({ hash, token: a.token, wallet: team.wallet, side: a.kind });
+    if (fill === null) continue;
+    const id = a.id as Id<"approvals">;
+    if (fill === "reverted") {
+      await mutate(api.approvals.finish, { id, status: "failed", result: { hash, error: "The transaction reverted." } });
+    } else if (a.kind === "buy") {
+      await mutate(api.book.bought, { owner: a.owner, strategyId: (a.strategyId ?? undefined) as Id<"strategies"> | undefined, token: a.token, symbol: a.symbol, tokens: fill.tokens.toString(), wei: fill.wei.toString(), hash });
+      await mutate(api.approvals.finish, { id, status: "done", result: { hash, wei: fill.wei.toString(), tokens: fill.tokens.toString() } });
+    } else {
+      const held = await ex.tokenBalance(team.wallet, a.token);
+      await mutate(api.book.sold, { owner: a.owner, token: a.token, symbol: a.symbol, tokens: fill.tokens.toString(), wei: fill.wei.toString(), hash, closes: held === 0n });
+      await mutate(api.approvals.finish, { id, status: "done", result: { hash, wei: fill.wei.toString(), tokens: fill.tokens.toString() } });
+    }
+    out.push(`settled ${a.kind} ${a.symbol} ${hash}`);
   }
   return out;
 }

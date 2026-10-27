@@ -10,6 +10,8 @@ export default defineSchema({
     policyId: v.string(),
     /** One transaction at a time per wallet (nonces): a lease the Next server takes and returns. */
     busyUntil: v.optional(v.number()),
+    /** Who holds the lease, so a holder whose lease expired cannot release someone else's. */
+    busyToken: v.optional(v.string()),
     /** The open conversation. History is append-only within a thread; a new chat starts the next one. */
     thread: v.number(),
   }).index("by_owner", ["owner"]),
@@ -43,7 +45,8 @@ export default defineSchema({
     symbol: v.string(),
     amount: v.string(),
     reason: v.string(),
-    status: v.union(v.literal("pending"), v.literal("approved"), v.literal("skipped"), v.literal("expired"), v.literal("done"), v.literal("failed")),
+    /** "sent": broadcast but not confirmed in time; the tick settles it from the receipt. */
+    status: v.union(v.literal("pending"), v.literal("approved"), v.literal("skipped"), v.literal("expired"), v.literal("sent"), v.literal("done"), v.literal("failed")),
     result: v.optional(v.any()),
     decidedAt: v.optional(v.number()),
   })

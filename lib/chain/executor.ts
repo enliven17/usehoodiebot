@@ -230,6 +230,30 @@ export function createExecutor(d: ExecutorDeps) {
       return quotePool(m.pool, side === "buy", amount);
     },
 
+    /**
+     * The fill of a trade sent earlier whose confirmation timed out: null while it is still unknown, "reverted" if it
+     * failed. Buys read tokens from Transfer logs and ETH from the tx value; sells read the curve event, or 0 ETH when it
+     * went through the router (ponytail: the balance diff is gone by now; the trade row is still booked).
+     */
+    async settle(a: { hash: string; token: string; wallet: string; side: "buy" | "sell" }): Promise<Fill | "reverted" | null> {
+      const hash = a.hash as Hex;
+      const receipt = await client.getTransactionReceipt({ hash }).catch(() => null);
+      if (!receipt) return null;
+      if (receipt.status !== "success") return "reverted";
+      const delta = tokenDelta(receipt, a.token, a.wallet);
+      if (a.side === "buy") return { hash, wei: (await client.getTransaction({ hash })).value, tokens: delta > 0n ? delta : 0n };
+      let eth = 0n;
+      for (const l of receipt.logs) {
+        try {
+          eth = curveFill(receipt, l.address, "CurveSell").eth;
+          break;
+        } catch {
+          /* not the curve */
+        }
+      }
+      return { hash, wei: eth, tokens: delta < 0n ? -delta : 0n };
+    },
+
     /** Sends ETH out; the wallet's policy only allows the owner and the treasury. */
     async transfer(a: { walletId: string; wallet: string; to: string; wei: bigint }): Promise<string> {
       return (await send(a.walletId, a.wallet, { to: addr(a.to), value: a.wei, data: "0x" })).transactionHash;
@@ -304,3 +328,6 @@ export function createExecutor(d: ExecutorDeps) {
 }
 
 export type Executor = ReturnType<typeof createExecutor>;
+
+/** Broadcast but not seen confirmed: it may still land, so it must never be treated as "did not happen". */
+export const isAmbiguousSend = (err: unknown) => err instanceof Error && err.name === "AmbiguousSendError";

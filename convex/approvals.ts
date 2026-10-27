@@ -31,8 +31,25 @@ export const claim = mutation({
   },
 });
 
+/** A trade the tick made in auto mode that was broadcast but not confirmed: tracked here until it settles. */
+export const recordSent = mutation({
+  args: { secret, owner: v.string(), strategyId: v.optional(v.id("strategies")), kind, token: v.string(), symbol: v.string(), amount: v.string(), reason: v.string(), hash: v.string() },
+  handler: async (ctx, { secret: s, hash, ...a }) => {
+    guard(s);
+    await ctx.db.insert("approvals", { ...a, status: "sent", result: { hash }, decidedAt: Date.now() });
+  },
+});
+
+export const sent = query({
+  args: { secret },
+  handler: async (ctx, a) => {
+    guard(a.secret);
+    return (await ctx.db.query("approvals").withIndex("by_status", (q) => q.eq("status", "sent")).take(50)).map(shape);
+  },
+});
+
 export const finish = mutation({
-  args: { secret, id: v.id("approvals"), status: v.union(v.literal("done"), v.literal("failed")), result: v.any() },
+  args: { secret, id: v.id("approvals"), status: v.union(v.literal("sent"), v.literal("done"), v.literal("failed")), result: v.any() },
   handler: async (ctx, a) => {
     guard(a.secret);
     await ctx.db.patch(a.id, { status: a.status, result: a.result });
