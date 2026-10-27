@@ -53,7 +53,7 @@ export function Message({ line }: { line: Line }) {
           <p className={s.steps}>
             {line.steps.map((st, i) => (
               <span key={i} className={s.stepChip} style={{ ["--eye" as string]: TEAM[st.member as Member]?.eyes ?? TEAM.hoodiebot.eyes }}>
-                {TEAM[st.member as Member]?.name ?? "HOODIEBOT"} {STEP_LABEL[st.tool] ?? st.tool}
+                {TEAM[st.member as Member]?.name ?? "Hoodie"} {STEP_LABEL[st.tool] ?? st.tool}
               </span>
             ))}
           </p>

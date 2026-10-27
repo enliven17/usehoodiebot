@@ -42,7 +42,7 @@ const SWATCHES: Array<[string, string, string]> = [
   ["Panel", "#0A0E15", "cards, the rail, wells"],
   ["Mist", "#F1F4F8", "text"],
   ["Mist 400", "#9AA4B4", "secondary text"],
-  ["Cyan", "#7CE8F2", "HOODIEBOT, focus, the one thing to look at"],
+  ["Cyan", "#7CE8F2", "Hoodie, focus, the one thing to look at"],
   ["Violet", "#B9A6FF", "ResearchBot, the far end of the gradient"],
   ["Red", "#FCA5A5", "SniperBot, losses, errors"],
   ["Green", "#9FE8B5", "TraderBot, gains"],
@@ -124,7 +124,7 @@ function body(name: Name): ReactNode {
           <div className={s.logoRow}>
             <div className={s.logoCell}><Mark size={220} /><span>Mark, gradient</span></div>
             <div className={s.logoCell}><div className={s.tile} style={{ width: 220, height: 220, borderRadius: 52 }}><Mark size={130} /></div><span>Tile, app icon</span></div>
-            <div className={s.logoCell}><Hoodie size={220} still="neutral" /><span>HOODIEBOT, the character</span></div>
+            <div className={s.logoCell}><Hoodie size={220} still="neutral" /><span>Hoodie, the character</span></div>
           </div>
           <div className={s.logoRow}><Word size={64} /></div>
           <div className={s.logoRow}>{[64, 32, 16].map((n) => <Mark key={n} size={n} />)}<span className={s.note}>The face is open: the ground shows through. Never fill it, outline it or recolour the gradient.</span></div>
@@ -154,7 +154,7 @@ function body(name: Name): ReactNode {
           <h2 className={s.sheetTitle}>Type</h2>
           <p className={s.typeDisplay}>Watch every <span className="grad">Pons launch</span></p>
           <p className={s.typeMeta}>Geist 300 · display · tracking −0.045em · sentence case</p>
-          <p className={s.typeBody}>Tell HOODIEBOT what to watch. Its specialists research Pons launches, wait for your entry and trade inside your rules.</p>
+          <p className={s.typeBody}>Tell Hoodie what to watch. Its specialists research Pons launches, wait for your entry and trade inside your rules.</p>
           <p className={s.typeMeta}>Geist 400 · body · 17px / 1.55</p>
           <p className={s.typeMono}><span className="slash">/</span>strategy · mcap ≤ $60k · 0.01 ETH · +36.5%</p>
           <p className={s.typeMeta}>Geist Mono · numbers, addresses, chips</p>

@@ -22,7 +22,7 @@ export default function Home() {
                 <div className={s.halo} />
                 <div data-intro style={{ width: "100%" }}><Headline className={s.h1} /></div>
                 <p className={s.lede} data-intro>
-                  Tell HOODIEBOT what to watch. Its specialists research Pons launches, wait for your entry and trade inside your rules.
+                  Tell Hoodie what to watch. Its specialists research Pons launches, wait for your entry and trade inside your rules.
                 </p>
                 <HeroComposer />
                 {ca ? <CopyCa ca={ca} /> : null}

@@ -33,12 +33,12 @@ export function HeroComposer() {
           go(text);
         }}
       >
-        <label htmlFor="prompt" className="sr-only">Tell HOODIEBOT what to do</label>
+        <label htmlFor="prompt" className="sr-only">Tell Hoodie what to do</label>
         <textarea
           id="prompt"
           rows={2}
           value={text}
-          placeholder="Tell HOODIEBOT what to watch…"
+          placeholder="Tell Hoodie what to watch…"
           onChange={(e) => {
             setText(e.target.value);
             fieldEvent("typing");
@@ -53,9 +53,9 @@ export function HeroComposer() {
         <div className={s.toolbar}>
           <span className={s.who}>
             <Hoodie size={28} mood={text ? "listening" : "idle"} />
-            HOODIEBOT · Robinhood Chain
+            Hoodie · Robinhood Chain
           </span>
-          <button type="submit" className={s.send} data-ready={text.trim() ? "" : undefined} aria-label="Send to HOODIEBOT">
+          <button type="submit" className={s.send} data-ready={text.trim() ? "" : undefined} aria-label="Send to Hoodie">
             <svg className="i" viewBox="0 0 24 24"><path d="M7 7h10v10" /><path d="M7 17 17 7" /></svg>
           </button>
         </div>

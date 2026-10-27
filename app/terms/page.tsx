@@ -7,8 +7,8 @@ export const metadata: Metadata = { title: "Terms" };
 export default function Terms() {
   return (
     <Doc title="Terms" updated="October 2026">
-      <p>By using HOODIEBOT you agree to these terms. If you do not agree, do not use it.</p>
-      <h2>What HOODIEBOT is</h2>
+      <p>By using Hoodie you agree to these terms. If you do not agree, do not use it.</p>
+      <h2>What Hoodie is</h2>
       <p>
         Software that researches and trades tokens on Robinhood Chain for you, from a wallet created for your team, under the rules
         you set. It is not a broker, an exchange, an adviser or a custodian of anything other than that wallet&apos;s signing key,
@@ -22,7 +22,7 @@ export default function Terms() {
       </ul>
       <h2>No advice, no guarantees</h2>
       <p>
-        Nothing HOODIEBOT says is financial advice. Market data comes from third parties and can be late or wrong. The model can be
+        Nothing Hoodie says is financial advice. Market data comes from third parties and can be late or wrong. The model can be
         wrong. Trades can fail, fill at a worse price than quoted within your slippage, or lose everything.
       </p>
       <h2>Availability</h2>

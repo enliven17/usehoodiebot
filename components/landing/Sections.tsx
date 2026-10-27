@@ -36,7 +36,7 @@ export function Product() {
           <div className={s.sectionHead} data-reveal>
             <h2 className={s.h2}>One message. The whole team moves.</h2>
             <p className={s.sub}>
-              Tell HOODIEBOT what you want done in plain words. It sends the work to the right specialist, keeps what they find, and
+              Tell Hoodie what you want done in plain words. It sends the work to the right specialist, keeps what they find, and
               only brings you in when a trade needs your yes.
             </p>
           </div>
@@ -51,7 +51,7 @@ export function Product() {
             </li>
           </ul>
         </div>
-        <div className={s.panel} role="img" aria-label="An example conversation with HOODIEBOT" data-reveal>
+        <div className={s.panel} role="img" aria-label="An example conversation with Hoodie" data-reveal>
           <div className={s.thread}>
             <div className={`${s.msg} ${s.msgMe}`}>
               <div className={s.bubble}>Find me something fresh on Pons with real buyers. 0.02 ETH max.</div>
@@ -71,7 +71,7 @@ export function Product() {
             <div className={s.msg}>
               <Hoodie size={34} mood="listening" />
               <div className={s.bubble}>
-                <span className={s.by}>HOODIEBOT</span>
+                <span className={s.by}>Hoodie</span>
                 It passes your checks. TraderBot has the entry ready.
                 <div className={s.approve}>
                   <span className="num">Buy 0.02 ETH of LODGER</span>
@@ -125,12 +125,12 @@ export function Strategies() {
         <div>
           <div className={s.sectionHead} data-reveal>
             <h2 className={s.h2}>A Strategy is your rules, written once.</h2>
-            <p className={s.sub}>Choose what to watch, what has to pass, and what happens when something matches. HOODIEBOT checks the market every minute.</p>
+            <p className={s.sub}>Choose what to watch, what has to pass, and what happens when something matches. Hoodie checks the market every minute.</p>
           </div>
           <ul className={s.points} data-reveal-group>
             <li><h3>Cover more of the market</h3><p>Every new Pons launch and every graduated pool, read while you are away.</p></li>
             <li><h3>Keep your rules consistent</h3><p>The same filters on the hundredth token as on the first. No chasing.</p></li>
-            <li><h3>Skip the repetitive work</h3><p>Write it in a sentence. HOODIEBOT turns it into a Strategy you can read and edit.</p></li>
+            <li><h3>Skip the repetitive work</h3><p>Write it in a sentence. Hoodie turns it into a Strategy you can read and edit.</p></li>
           </ul>
         </div>
       </div>
@@ -203,7 +203,7 @@ export function Closing() {
       <div className={`${s.panel} ${s.closing}`} data-reveal>
         <Hoodie size={120} mood="happy" />
         <h2 className={s.h2}>Put your team to work.</h2>
-        <Link className="btn btn-primary btn-lg" href="/app">Open HOODIEBOT</Link>
+        <Link className="btn btn-primary btn-lg" href="/app">Open Hoodie</Link>
       </div>
     </section>
   );

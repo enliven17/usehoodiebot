@@ -183,7 +183,7 @@ export function Trade({ snap, onChange }: { snap: Snapshot; onChange: () => void
                 <ul className={s.list}>
                   {decisions.map((e) => (
                     <li key={e.id} className={s.why} style={{ ["--eye" as string]: TEAM[e.member as Member]?.eyes ?? TEAM.hoodiebot.eyes }}>
-                      <span><strong>{TEAM[e.member as Member]?.name ?? "HOODIEBOT"}</strong> {e.text}</span>
+                      <span><strong>{TEAM[e.member as Member]?.name ?? "Hoodie"}</strong> {e.text}</span>
                       <time className="num faint">{ago(e.at)}</time>
                     </li>
                   ))}

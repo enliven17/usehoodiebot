@@ -1,4 +1,4 @@
-Meet HOODIEBOT: your private trading team on Robinhood Chain.
+Meet Hoodie: your private trading team on Robinhood Chain.
 
 You talk to one bot. ResearchBot reads the Pons tape, SniperBot watches your entries, TraderBot trades inside your rules and LaunchBot gets your token out.
 

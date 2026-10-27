@@ -19,7 +19,7 @@ const config = createConfig(
     chains: [robinhood],
     transports: { [robinhood.id]: http() },
     walletConnectProjectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ?? "",
-    appName: "HOODIEBOT",
+    appName: "Hoodie",
     appDescription: "Your private trading team on Robinhood Chain",
     appUrl: SITE,
     appIcon: `${SITE}/apple-icon.png`,

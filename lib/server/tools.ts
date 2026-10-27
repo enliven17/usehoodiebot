@@ -53,7 +53,7 @@ export const TOOLS: Tool[] = [
       const token = normalizeToken(i.token);
       if (!token) return { error: "Not a token address." };
       const ex = getExecutor();
-      if (!(await ex.onlyTradable([{ token }])).length) return { error: "Not a Pons V2 token priced in ETH; HOODIEBOT does not trade it." };
+      if (!(await ex.onlyTradable([{ token }])).length) return { error: "Not a Pons V2 token priced in ETH; Hoodie does not trade it." };
       const [m, listed, quote] = await Promise.all([ex.market(token), candidates().then((l) => l.find((c) => c.token === token)), ex.quote(token, "buy", parseEther("0.01")).catch(() => null)]);
       return { token, explorer: addressUrl(token), tradesOn: m.kind === "curve" ? "Pons bonding curve" : "Uniswap v4 (graduated)", market: listed ? brief(listed) : null, tokensFor001Eth: quote === null ? null : formatEther(quote) };
     },

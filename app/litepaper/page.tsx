@@ -4,14 +4,14 @@ import { Doc } from "@/components/doc/Doc";
 import { Hoodie } from "@/components/Hoodie";
 import { MEMBERS, TEAM } from "@/lib/team";
 
-const description = "How HOODIEBOT works: a private trading team for Pons tokens on Robinhood Chain.";
-export const metadata: Metadata = { title: "Litepaper", description, openGraph: { title: "HOODIEBOT Litepaper", description, images: [{ url: "/og/litepaper.png", width: 1200, height: 630 }] } };
+const description = "How Hoodie works: a private trading team for Pons tokens on Robinhood Chain.";
+export const metadata: Metadata = { title: "Litepaper", description, openGraph: { title: "Hoodie Litepaper", description, images: [{ url: "/og/litepaper.png", width: 1200, height: 630 }] } };
 
 export default function Litepaper() {
   return (
     <Doc title="Litepaper" updated="October 2026" figure={MEMBERS.map((m) => <Hoodie key={m} member={m} size={m === "hoodiebot" ? 72 : 52} />)}>
       <p>
-        HOODIEBOT is a private trading team for the memecoins launched on Pons, on Robinhood Chain. You talk to one bot. It hands the work
+        Hoodie is a private trading team for the memecoins launched on Pons, on Robinhood Chain. You talk to one bot. It hands the work
         to four specialists, and they trade from a wallet that belongs to your team alone, inside rules you can read.
       </p>
 
@@ -30,7 +30,7 @@ export default function Litepaper() {
         </tbody>
       </table>
       <p>
-        HOODIEBOT is a Claude model with tools. Each specialist is a set of those tools: ResearchBot reads GeckoTerminal and the chain,
+        Hoodie is a Claude model with tools. Each specialist is a set of those tools: ResearchBot reads GeckoTerminal and the chain,
         SniperBot saves and runs Strategies, TraderBot puts trades in front of you, LaunchBot reads the live launch fee and checks a
         name and symbol. What one of them finds stays in the conversation, so the next one starts from it.
       </p>
@@ -67,8 +67,8 @@ export default function Litepaper() {
 
       <h2>Trading</h2>
       <p>
-        While a token is on its Pons curve, HOODIEBOT trades the curve directly. Once 4.2 ETH has been raised it graduates into a
-        Uniswap v4 pool and HOODIEBOT routes there instead, quoting through the V4 Quoter so the Pons hook fee is included. Every trade
+        While a token is on its Pons curve, Hoodie trades the curve directly. Once 4.2 ETH has been raised it graduates into a
+        Uniswap v4 pool and Hoodie routes there instead, quoting through the V4 Quoter so the Pons hook fee is included. Every trade
         has a minimum output set from your slippage, and every position is booked from the transaction receipt, never from the quote.
       </p>
 
