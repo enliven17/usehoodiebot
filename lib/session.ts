@@ -6,6 +6,8 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { getAddress, isAddress, verifyMessage, type Address } from "viem";
 
+import { signInMessage } from "./sign-in-message";
+
 const SESSION = "hb_session";
 const NONCE = "hb_nonce";
 const SESSION_MS = 30 * 24 * 3600_000;
@@ -32,8 +34,6 @@ export function unseal(sealed: string | undefined, now = Date.now()): string | n
   return Number(body.slice(j + 1)) > now ? body.slice(0, j) : null;
 }
 
-export const signInMessage = (address: string, nonce: string) =>
-  `Sign in to HOODIEBOT\n\nThis only proves you own this wallet. It costs nothing and sends no transaction.\n\nAddress: ${address}\nNonce: ${nonce}`;
 
 const cookieOpts = (maxAge: number) => ({ httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax" as const, path: "/", maxAge: Math.floor(maxAge / 1000) });
 
