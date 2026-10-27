@@ -5,7 +5,7 @@ import { mutation, query } from "./_generated/server";
 import { guard, secret } from "./guard";
 
 /** Positions and fills, booked from transaction receipts by the Next server. */
-const position = (p: Doc<"positions">) => ({ id: p._id as string, owner: p.owner, strategyId: (p.strategyId as string | undefined) ?? null, token: p.token, symbol: p.symbol, tokens: p.tokens, costWei: p.costWei, openedAt: p._creationTime, takeProfitPct: p.takeProfitPct ?? null, stopLossPct: p.stopLossPct ?? null });
+const position = (p: Doc<"positions">) => ({ id: p._id as string, owner: p.owner, strategyId: (p.strategyId as string | undefined) ?? null, token: p.token, symbol: p.symbol, tokens: p.tokens, costWei: p.costWei, openedAt: p._creationTime, takeProfitPct: p.takeProfitPct ?? null, stopLossPct: p.stopLossPct ?? null, trailingStopPct: p.trailingStopPct ?? null, peakEth: p.peakEth ?? null });
 
 export const open = query({
   args: { secret, owner: v.string() },
@@ -24,7 +24,7 @@ export const openForStrategy = query({
 });
 
 export const bought = mutation({
-  args: { secret, owner: v.string(), strategyId: v.optional(v.id("strategies")), token: v.string(), symbol: v.string(), tokens: v.string(), wei: v.string(), hash: v.string(), takeProfitPct: v.optional(v.number()), stopLossPct: v.optional(v.number()) },
+  args: { secret, owner: v.string(), strategyId: v.optional(v.id("strategies")), token: v.string(), symbol: v.string(), tokens: v.string(), wei: v.string(), hash: v.string(), takeProfitPct: v.optional(v.number()), stopLossPct: v.optional(v.number()), trailingStopPct: v.optional(v.number()) },
   handler: async (ctx, { secret: s, wei, hash, ...p }) => {
     guard(s);
     await ctx.db.insert("positions", { ...p, costWei: wei });
@@ -89,11 +89,11 @@ export const tradedTokens = query({
 
 /** Sets (or clears, with undefined) the exits on the owner's open hand-bought positions in a token. */
 export const setExits = mutation({
-  args: { secret, owner: v.string(), token: v.string(), takeProfitPct: v.optional(v.number()), stopLossPct: v.optional(v.number()) },
+  args: { secret, owner: v.string(), token: v.string(), takeProfitPct: v.optional(v.number()), stopLossPct: v.optional(v.number()), trailingStopPct: v.optional(v.number()) },
   handler: async (ctx, a) => {
     guard(a.secret);
     const open = (await ctx.db.query("positions").withIndex("by_owner_open", (q) => q.eq("owner", a.owner).eq("closedAt", undefined)).collect()).filter((p) => p.token === a.token && !p.strategyId);
-    for (const p of open) await ctx.db.patch(p._id, { takeProfitPct: a.takeProfitPct, stopLossPct: a.stopLossPct });
+    for (const p of open) await ctx.db.patch(p._id, { takeProfitPct: a.takeProfitPct, stopLossPct: a.stopLossPct, trailingStopPct: a.trailingStopPct });
     return open.length;
   },
 });
@@ -104,6 +104,16 @@ export const withExits = query({
   handler: async (ctx, a) => {
     guard(a.secret);
     const open = await ctx.db.query("positions").withIndex("by_open", (q) => q.eq("closedAt", undefined)).take(500);
-    return open.filter((p) => p.takeProfitPct !== undefined || p.stopLossPct !== undefined).map(position);
+    return open.filter((p) => p.takeProfitPct !== undefined || p.stopLossPct !== undefined || p.trailingStopPct !== undefined).map(position);
+  },
+});
+
+/** Raises a position's recorded high; a lower price leaves it alone. */
+export const peak = mutation({
+  args: { secret, id: v.id("positions"), priceEth: v.number() },
+  handler: async (ctx, a) => {
+    guard(a.secret);
+    const p = await ctx.db.get(a.id);
+    if (p && p.closedAt === undefined && a.priceEth > (p.peakEth ?? 0)) await ctx.db.patch(a.id, { peakEth: a.priceEth });
   },
 });

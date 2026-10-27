@@ -64,6 +64,11 @@ if (!reopened.lines.length) throw new Error("reopened chat is empty");
 // trade screen: token list, candles for the busiest one, and a hand buy refused for lack of ETH (nothing is sent)
 const market = (await step("market list", () => call("/api/market"))) as { tokens: Array<{ token: string; symbol: string }> };
 const pick = market.tokens[0]!;
+const asked = (await step(`ask about ${pick.symbol}`, () => call("/api/chat", { method: "POST", json: { text: `Should I buy 0.01 ETH of ${pick.token}? Check it properly first.` } }))) as { lines: Array<{ text: string; steps: Array<{ member: string; tool: string }> }> };
+const verdict = asked.lines.at(-1)!;
+console.log("    steps", verdict.steps.map((x) => `${x.member}:${x.tool}`).join(", "));
+console.log("    reply", verdict.text.slice(0, 400).replaceAll("\n", " "));
+if (!verdict.steps.some((x) => x.tool === "check_safety")) throw new Error("ShieldBot was not asked before a buy");
 const view = (await step(`token ${pick.symbol}`, () => call(`/api/market/${pick.token}`))) as { market: { pool: string } | null; held: number | null };
 console.log("    pool", view.market?.pool, "held", view.held);
 const q = (await step("quote 0.001 ETH", () => call(`/api/quote?token=${pick.token}&side=buy&eth=0.001`))) as { in: number; out: number; spot: number | null };

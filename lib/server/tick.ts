@@ -4,8 +4,9 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { parseEther } from "viem";
 
 import { candidates, type Candidate } from "../chain/market";
+import { shield, shieldLine } from "../chain/shield";
 import { api, mutate, query } from "../db";
-import { exitReason, parseSpec, rejects, type Spec } from "../strategy";
+import { exitReason, parseSpec, rejects, sizeFor, type Spec } from "../strategy";
 import { safeMessage } from "./errors";
 import { eth, fillEvent, logEvent } from "./events";
 import { APPROVAL_TTL_MS, getExecutor, getTeam, propose, SentTrade, trade, tradeNow, type Team } from "./team";
@@ -39,10 +40,24 @@ async function enter(s: Strategy, spec: Spec, market: Candidate[]) {
   const sid = s.id as Id<"strategies">;
   const [open, pending] = await Promise.all([query(api.book.openForStrategy, { strategyId: sid }), query(api.approvals.pending, { owner: s.owner })]);
   if (open.length + pending.filter((a) => a.strategyId === s.id && a.kind === "buy").length >= spec.maxOpen) return [];
+  // ponytail: ShieldBot reads at most 3 new matches per strategy per tick (two GeckoTerminal calls each, cached)
+  let checked = 0;
   for (const c of await getExecutor().onlyTradable(market.filter((c) => rejects(spec, c) === null))) {
+    if (checked >= 3) break;
     if (!(await mutate(api.strategies.match, { strategyId: sid, token: c.token }))) continue;
-    const wei = parseEther(String(spec.sizeEth));
-    const why = `${s.name}: ${c.symbol} matched${c.curvePct !== undefined ? `, ${c.curvePct.toFixed(1)}% up its curve` : ""}${c.mcapUsd !== undefined ? `, $${Math.round(c.mcapUsd).toLocaleString("en-US")} market cap` : ""}.`;
+    checked++;
+    // a match ShieldBot turns down stays matched: it is not looked at again by this strategy
+    const safety = await shield(c.token, c.pool).catch(() => null);
+    if (!safety) {
+      await mutate(api.strategies.unmatch, { strategyId: sid, token: c.token }); // no read this time: try again next tick
+      continue;
+    }
+    if (safety.blocks.length || (spec.minSafetyScore !== undefined && safety.score < spec.minSafetyScore)) {
+      await logEvent(s.owner, { member: "shield", kind: "skip", text: `Skipped ${c.symbol} for ${s.name}. ${safety.blocks.length ? safety.blocks[0] : `Safety ${safety.score}/100 is under the ${spec.minSafetyScore} bar. ${safety.warns.join(" ")}`}`, token: c.token, symbol: c.symbol });
+      continue;
+    }
+    const wei = parseEther(String(sizeFor(spec, safety.score)));
+    const why = `${s.name}: ${c.symbol} matched${c.curvePct !== undefined ? `, ${c.curvePct.toFixed(1)}% up its curve` : ""}${c.mcapUsd !== undefined ? `, $${Math.round(c.mcapUsd).toLocaleString("en-US")} market cap` : ""}. ${shieldLine(safety)}`;
     await logEvent(s.owner, { member: "sniper", kind: "match", text: why, token: c.token, symbol: c.symbol });
     if (s.mode === "ask") {
       await propose(s.owner, { kind: "buy", token: c.token, symbol: c.symbol, amount: wei, reason: why, strategyId: s.id });
@@ -56,16 +71,29 @@ async function enter(s: Strategy, spec: Spec, market: Candidate[]) {
   return [];
 }
 
+/** Records a new high for each position whose price beat it; returns the high to measure a trailing stop from. */
+async function highs(open: Array<{ id: string; peakEth: number | null }>, prices: Map<string, number>, tokenOf: (id: string) => string) {
+  const out = new Map<string, number>();
+  for (const p of open) {
+    const price = prices.get(tokenOf(p.id));
+    const peak = Math.max(p.peakEth ?? 0, price ?? 0);
+    out.set(p.id, peak);
+    if (price !== undefined && price > (p.peakEth ?? 0)) await mutate(api.book.peak, { id: p.id as Id<"positions">, priceEth: price });
+  }
+  return out;
+}
+
 async function exit(s: Strategy, spec: Spec) {
-  if (spec.takeProfitPct === undefined && spec.stopLossPct === undefined) return [];
+  if (spec.takeProfitPct === undefined && spec.stopLossPct === undefined && spec.trailingStopPct === undefined) return [];
   const open = await query(api.book.openForStrategy, { strategyId: s.id as Id<"strategies"> });
   if (!open.length) return [];
   const prices = await getExecutor().prices(open.map((p) => p.token));
+  const peaks = await highs(open, prices, (id) => open.find((p) => p.id === id)!.token);
   const out: string[] = [];
   for (const p of open) {
     const price = prices.get(p.token);
     const entry = Number(p.costWei) / Number(p.tokens); // ETH per whole token: both sides 18 decimals
-    const why = price === undefined ? null : exitReason(spec, entry, price);
+    const why = price === undefined ? null : exitReason(spec, entry, price, peaks.get(p.id));
     if (!why) continue;
     const reason = `${s.name}: ${p.symbol} hit ${why} (${((price! / entry - 1) * 100).toFixed(0)}%).`;
     await logEvent(s.owner, { member: "sniper", kind: "exit", text: reason, token: p.token, symbol: p.symbol });
@@ -103,11 +131,12 @@ async function handExits() {
   const open = await query(api.book.withExits, {});
   if (!open.length) return [];
   const prices = await getExecutor().prices([...new Set(open.map((p) => p.token))]);
+  const peaks = await highs(open, prices, (id) => open.find((p) => p.id === id)!.token);
   const out: string[] = [];
   for (const p of open) {
     const price = prices.get(p.token);
     const entry = Number(p.costWei) / Number(p.tokens);
-    const why = price === undefined ? null : exitReason({ takeProfitPct: p.takeProfitPct ?? undefined, stopLossPct: p.stopLossPct ?? undefined } as Spec, entry, price);
+    const why = price === undefined ? null : exitReason({ takeProfitPct: p.takeProfitPct ?? undefined, stopLossPct: p.stopLossPct ?? undefined, trailingStopPct: p.trailingStopPct ?? undefined }, entry, price, peaks.get(p.id));
     if (!why) continue;
     const reason = `${p.symbol} hit your ${why} (${((price! / entry - 1) * 100).toFixed(0)}%).`;
     await logEvent(p.owner, { member: "trader", kind: "exit", text: reason, token: p.token, symbol: p.symbol });

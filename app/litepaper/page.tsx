@@ -31,7 +31,9 @@ export default function Litepaper() {
       </table>
       <p>
         Hoodie is a Claude model with tools. Each specialist is a set of those tools: ResearchBot reads GeckoTerminal and the chain,
-        SniperBot saves and runs Strategies, TraderBot puts trades in front of you, LaunchBot reads the live launch fee and checks a
+        SniperBot saves and runs Strategies, ShieldBot checks every token before a buy (creator holdings and selling, honeypots, one
+        buyer split across wallets, how concentrated the buying is) and blocks the bad ones outright, TraderBot puts trades in front
+        of you, LaunchBot reads the live launch fee and checks a
         name and symbol. What one of them finds stays in the conversation, so the next one starts from it.
       </p>
 

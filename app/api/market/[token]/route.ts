@@ -24,7 +24,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
     return Response.json({
       market,
       trades: trades.map((t) => ({ side: t.side, eth: Number(t.wei) / 1e18, tokens: Number(t.tokens) / 1e18, hash: t.hash, at: t.at })),
-      position: mine.length ? { tokens: mine.reduce((s, p) => s + Number(p.tokens) / 1e18, 0), costEth: mine.reduce((s, p) => s + Number(p.costWei) / 1e18, 0), takeProfitPct: hand?.takeProfitPct ?? null, stopLossPct: hand?.stopLossPct ?? null, hand: !!hand } : null,
+      position: mine.length ? { tokens: mine.reduce((s, p) => s + Number(p.tokens) / 1e18, 0), costEth: mine.reduce((s, p) => s + Number(p.costWei) / 1e18, 0), takeProfitPct: hand?.takeProfitPct ?? null, stopLossPct: hand?.stopLossPct ?? null, trailingStopPct: hand?.trailingStopPct ?? null, hand: !!hand } : null,
       held: held === null ? null : Number(held) / 1e18,
     });
   } catch (err) {

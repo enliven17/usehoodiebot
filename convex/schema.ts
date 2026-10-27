@@ -67,6 +67,9 @@ export default defineSchema({
     /** Exits the owner set on a hand-bought position; the tick sells it when one is hit. */
     takeProfitPct: v.optional(v.number()),
     stopLossPct: v.optional(v.number()),
+    trailingStopPct: v.optional(v.number()),
+    /** the highest price (ETH per token) seen while held: what a trailing stop measures from */
+    peakEth: v.optional(v.number()),
   })
     .index("by_owner_open", ["owner", "closedAt"])
     .index("by_open", ["closedAt"])
@@ -75,7 +78,7 @@ export default defineSchema({
   /** What the team decided and did, newest first in the app: matches, research, asks, fills, exits, skips. */
   events: defineTable({
     owner: v.string(),
-    member: v.union(v.literal("hoodiebot"), v.literal("research"), v.literal("sniper"), v.literal("trader"), v.literal("launch")),
+    member: v.union(v.literal("hoodiebot"), v.literal("research"), v.literal("sniper"), v.literal("trader"), v.literal("launch"), v.literal("shield")),
     kind: v.string(),
     text: v.string(),
     token: v.optional(v.string()),

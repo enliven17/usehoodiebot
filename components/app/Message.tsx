@@ -11,7 +11,7 @@ import s from "./app.module.css";
 
 const STEP_LABEL: Record<string, string> = {
   scan_market: "scanned the market", research_token: "read the token", get_wallet: "checked the wallet", propose_trade: "prepared a trade",
-  create_strategy: "saved a strategy", list_strategies: "read your strategies", update_strategy: "updated a strategy", prepare_launch: "checked the launch",
+  check_safety: "checked the safety", create_strategy: "saved a strategy", list_strategies: "read your strategies", update_strategy: "updated a strategy", prepare_launch: "checked the launch",
 };
 
 const Spans = ({ spans }: { spans: Span[] }) => (

@@ -11,11 +11,11 @@ export type MarketToken = Partial<Candidate> & { token: string; symbol: string; 
 export type TokenView = {
   market: (Candidate & { pool: string }) | null;
   trades: Fill[];
-  position: { tokens: number; costEth: number; takeProfitPct: number | null; stopLossPct: number | null; hand: boolean } | null;
+  position: { tokens: number; costEth: number; takeProfitPct: number | null; stopLossPct: number | null; trailingStopPct: number | null; hand: boolean } | null;
   held: number | null;
 };
 export type Quote = { in: number; out: number; spot: number | null };
-type Exits = { takeProfitPct?: string; stopLossPct?: string };
+type Exits = { takeProfitPct?: string; stopLossPct?: string; trailingStopPct?: string };
 
 async function call<T>(path: string, init?: RequestInit & { json?: unknown }): Promise<T> {
   const res = await fetch(path, {

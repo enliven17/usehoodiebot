@@ -3,7 +3,8 @@ import "server-only";
 import { formatEther, parseEther } from "viem";
 
 import { addressUrl } from "../chain/robinhood";
-import { candidates, type Candidate } from "../chain/market";
+import { candidates, tokenMarket, type Candidate } from "../chain/market";
+import { shield } from "../chain/shield";
 import { FACTORY_ABI, PONS_FACTORY } from "../chain/pons";
 import { publicClient } from "../chain/robinhood";
 import { api, mutate, query } from "../db";
@@ -33,7 +34,16 @@ const SPEC_SCHEMA = obj({
   minCurvePct: { type: "number" }, maxCurvePct: { type: "number" }, maxAgeMinutes: { type: "number" },
   minBuySellRatio: { type: "number", description: "buys divided by sells over the last hour" },
   takeProfitPct: { type: "number" }, stopLossPct: { type: "number" },
+  trailingStopPct: { type: "number", description: "sell once the price falls this % from its high while held" },
+  minSafetyScore: { type: "number", description: "ShieldBot score 0-100 a token needs; size grows from half at the bar to full at 100. 60 is a sensible default." },
 }, ["watch", "sizeEth"]);
+
+/** ShieldBot's read on a token, with the pool looked up when the caller does not have it. */
+const safetyOf = async (token: string) => {
+  const listed = (await candidates().catch(() => [])).find((c) => c.token === token);
+  const pool = listed?.pool ?? (await tokenMarket(token).catch(() => null))?.pool;
+  return shield(token, pool);
+};
 
 export const TOOLS: Tool[] = [
   {
@@ -56,6 +66,17 @@ export const TOOLS: Tool[] = [
       if (!(await ex.onlyTradable([{ token }])).length) return { error: "Not a Pons V2 token priced in ETH; Hoodie does not trade it." };
       const [m, listed, quote] = await Promise.all([ex.market(token), candidates().then((l) => l.find((c) => c.token === token)), ex.quote(token, "buy", parseEther("0.01")).catch(() => null)]);
       return { token, explorer: addressUrl(token), tradesOn: m.kind === "curve" ? "Pons bonding curve" : "Uniswap v4 (graduated)", market: listed ? brief(listed) : null, tokensFor001Eth: quote === null ? null : formatEther(quote) };
+    },
+  },
+  {
+    name: "check_safety", member: "shield",
+    description: "ShieldBot's safety read on one token before any buy: honeypot flag, how much the creator still holds and whether they sold, holder count and top-10 share, whether one buyer is split across wallets (same odd buy size), how concentrated the recent buying is, and socials. Returns blocks (never buy), warnings, and a 0-100 score.",
+    input_schema: obj({ token: { type: "string", description: "0x token address" } }, ["token"]),
+    async run(_t, i) {
+      const token = normalizeToken(i.token);
+      if (!token) return { error: "Not a token address." };
+      const s = await safetyOf(token);
+      return { token, score: s.score, blocked: s.blocks.length > 0, blocks: s.blocks, warnings: s.warns, facts: s.facts };
     },
   },
   {
@@ -85,6 +106,11 @@ export const TOOLS: Tool[] = [
       if (!token || !(await getExecutor().onlyTradable([{ token }])).length) return { error: "Not a tradable Pons token." };
       const eth = Number(i.ethAmount);
       if (i.kind === "buy" && !(eth >= SPEC_LIMITS.sizeEth[0] && eth <= SPEC_LIMITS.sizeEth[1])) return { error: `Buy size must be ${SPEC_LIMITS.sizeEth[0]}–${SPEC_LIMITS.sizeEth[1]} ETH.` };
+      // ShieldBot has the last word on buys: a blocked token is never put in front of the owner
+      if (i.kind !== "sell") {
+        const s = await safetyOf(token).catch(() => null);
+        if (s?.blocks.length) return { error: `ShieldBot blocks this buy. ${s.blocks.join(" ")}` };
+      }
       const a = await propose(team.owner, { kind: i.kind === "sell" ? "sell" : "buy", token, symbol: String(i.symbol).slice(0, 24), amount: i.kind === "buy" ? parseEther(String(eth)) : 0n, reason: String(i.reason).slice(0, 280), strategyId: null });
       return { approvalId: a.id, status: "waiting for the owner", expiresInMinutes: 15 };
     },
@@ -166,6 +192,8 @@ function timeline(name: string, args: Record<string, unknown>, out: unknown): Te
       const what = m ? `${m.symbol}: ${m.curvePct ?? "?"}% up its curve, $${(m.liquidityUsd ?? 0).toLocaleString("en-US")} liquidity` : "a token that is not listed yet";
       return { member: "research", kind: "research", text: `Read ${what}, on ${String(o.tradesOn ?? "Pons")}.`, token: String(o.token ?? token ?? ""), symbol: m?.symbol };
     }
+    case "check_safety":
+      return { member: "shield", kind: "safety", text: o.blocked ? `Blocked a token: ${String((o.blocks as string[])[0] ?? "")}` : `Safety ${String(o.score)}/100${(o.warnings as string[]).length ? `: ${(o.warnings as string[]).join(" ")}` : ", nothing flagged."}`, token: String(o.token ?? token ?? "") };
     case "propose_trade":
       return { member: "trader", kind: "ask", text: `Put a ${args.kind === "sell" ? "sell" : `${args.ethAmount} ETH buy`} of ${symbol} up for your approval: ${String(args.reason ?? "").slice(0, 160)}`, token, symbol };
     case "create_strategy":

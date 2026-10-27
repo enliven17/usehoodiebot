@@ -12,7 +12,7 @@ export const maxDuration = 120;
 export async function POST(req: Request) {
   const team = await requireTeam();
   if (team instanceof Response) return team;
-  const b = (await req.json().catch(() => null)) as { side?: unknown; token?: unknown; symbol?: unknown; eth?: unknown; pct?: unknown; slippageBps?: unknown; takeProfitPct?: unknown; stopLossPct?: unknown } | null;
+  const b = (await req.json().catch(() => null)) as { side?: unknown; token?: unknown; symbol?: unknown; eth?: unknown; pct?: unknown; slippageBps?: unknown; takeProfitPct?: unknown; stopLossPct?: unknown; trailingStopPct?: unknown } | null;
   const token = normalizeToken(b?.token);
   const symbol = typeof b?.symbol === "string" ? b.symbol.replace(/[^\w$.\- ]/g, "").slice(0, 24) || "token" : "token";
   if (!token || (b?.side !== "buy" && b?.side !== "sell")) return fail(400, "Bad request.");

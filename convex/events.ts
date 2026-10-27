@@ -3,7 +3,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { guard, secret } from "./guard";
 
-const member = v.union(v.literal("hoodiebot"), v.literal("research"), v.literal("sniper"), v.literal("trader"), v.literal("launch"));
+const member = v.union(v.literal("hoodiebot"), v.literal("research"), v.literal("sniper"), v.literal("trader"), v.literal("launch"), v.literal("shield"));
 
 export const log = mutation({
   args: { secret, owner: v.string(), member, kind: v.string(), text: v.string(), token: v.optional(v.string()), symbol: v.optional(v.string()), hash: v.optional(v.string()), wei: v.optional(v.string()) },

@@ -196,7 +196,7 @@ export function SideSkeleton() {
 export function TeamStrip() {
   return (
     <div className={s.strip} aria-hidden="true">
-      {(["research", "sniper", "hoodiebot", "trader", "launch"] as const).map((m) => <Hoodie key={m} member={m} size={m === "hoodiebot" ? 64 : 44} mood="idle" />)}
+      {(["research", "sniper", "shield", "hoodiebot", "trader", "launch"] as const).map((m) => <Hoodie key={m} member={m} size={m === "hoodiebot" ? 64 : 40} mood="idle" />)}
     </div>
   );
 }

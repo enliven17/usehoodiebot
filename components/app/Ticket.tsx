@@ -30,6 +30,7 @@ export function Ticket({ pick, snap, view, last, side: asked, onDone }: { pick: 
   const [slip, setSlip] = useState("3");
   const [tp, setTp] = useState("");
   const [sl, setSl] = useState("");
+  const [trail, setTrail] = useState("");
   const [quote, setQuote] = useState<Quote | null>(null);
   const [quoteError, setQuoteError] = useState<string | null>(null);
   const [quoting, setQuoting] = useState(false);
@@ -52,7 +53,8 @@ export function Ticket({ pick, snap, view, last, side: asked, onDone }: { pick: 
   useEffect(() => {
     setTp(pos?.takeProfitPct ? String(pos.takeProfitPct) : "");
     setSl(pos?.stopLossPct ? String(pos.stopLossPct) : "");
-  }, [pos?.takeProfitPct, pos?.stopLossPct, pick?.token]);
+    setTrail(pos?.trailingStopPct ? String(pos.trailingStopPct) : "");
+  }, [pos?.takeProfitPct, pos?.stopLossPct, pos?.trailingStopPct, pick?.token]);
 
   // the live quote, a moment after the owner stops typing
   useEffect(() => {
@@ -81,7 +83,7 @@ export function Ticket({ pick, snap, view, last, side: asked, onDone }: { pick: 
     if (!pick) throw new Error("Pick a token first.");
     setMsg(null);
     try {
-      const exits = side === "buy" ? { takeProfitPct: tp || undefined, stopLossPct: sl || undefined } : {};
+      const exits = side === "buy" ? { takeProfitPct: tp || undefined, stopLossPct: sl || undefined, trailingStopPct: trail || undefined } : {};
       const r = await api.trade({ side, token: pick.token, symbol, slippageBps: Math.round(slipPct * 100), ...(side === "buy" ? { eth: amount, ...exits } : { pct }) });
       setMsg({ text: r.pending ? "Sent, waiting for the chain to confirm." : side === "buy" ? "Bought." : "Sold.", hash: r.hash });
       onDone();
@@ -95,8 +97,8 @@ export function Ticket({ pick, snap, view, last, side: asked, onDone }: { pick: 
     if (!pick) return;
     setMsg(null);
     try {
-      await api.exits({ token: pick.token, takeProfitPct: tp || undefined, stopLossPct: sl || undefined });
-      setMsg({ text: tp || sl ? "Exits saved. The team checks them every minute." : "Exits cleared." });
+      await api.exits({ token: pick.token, takeProfitPct: tp || undefined, stopLossPct: sl || undefined, trailingStopPct: trail || undefined });
+      setMsg({ text: tp || sl || trail ? "Exits saved. The team checks them every minute." : "Exits cleared." });
       onDone();
     } catch (err) {
       setMsg({ text: (err as Error).message, bad: true });
@@ -171,6 +173,10 @@ export function Ticket({ pick, snap, view, last, side: asked, onDone }: { pick: 
         <label>
           <span>Stop loss</span>
           <span className={s.exitField}><span className="down">-</span><input className="num" inputMode="decimal" placeholder="35" value={sl} onChange={(e) => setSl(e.target.value.replace(/[^\d.]/g, ""))} /><span>%</span></span>
+        </label>
+        <label>
+          <span>Trailing</span>
+          <span className={s.exitField}><span className="down">-</span><input className="num" inputMode="decimal" placeholder="25" value={trail} onChange={(e) => setTrail(e.target.value.replace(/[^\d.]/g, ""))} /><span>%</span></span>
         </label>
         {pos?.hand ? <button type="button" className={`btn ${s.saveExits}`} onClick={saveExits}>Save on position</button> : null}
       </fieldset>

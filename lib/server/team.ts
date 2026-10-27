@@ -61,7 +61,7 @@ export class SentTrade extends Error {
  * Buy `amount` wei of a token, or sell `amount` tokens of it (0 = all held; `positionId` = the position this sell
  * closes). Books the fill from the receipt. Throws SentTrade when the send is ambiguous.
  */
-export async function trade(team: Team, a: { kind: "buy" | "sell"; token: string; symbol: string; amount: bigint; slippageBps: number; strategyId: string | null; positionId?: string; takeProfitPct?: number; stopLossPct?: number }) {
+export async function trade(team: Team, a: { kind: "buy" | "sell"; token: string; symbol: string; amount: bigint; slippageBps: number; strategyId: string | null; positionId?: string; takeProfitPct?: number; stopLossPct?: number; trailingStopPct?: number }) {
   const ex = getExecutor();
   let hash: string | null = null;
   const base = { walletId: team.walletId, wallet: team.wallet, token: a.token, slippageBps: a.slippageBps, onSigned: async (h: string) => void (hash = h) };
@@ -70,7 +70,7 @@ export async function trade(team: Team, a: { kind: "buy" | "sell"; token: string
     const spendable = await ex.spendable(team.wallet);
     if (spendable < a.amount) throw new Error(`The wallet has ${formatEther(spendable)} ETH to trade; this needs ${formatEther(a.amount)}.`);
     const f = await ex.buy({ ...base, wei: a.amount }).catch(sent);
-    await mutate(api.book.bought, { owner: team.owner, strategyId: strategyId(a.strategyId), token: a.token, symbol: a.symbol, tokens: f.tokens.toString(), wei: f.wei.toString(), hash: f.hash, takeProfitPct: a.takeProfitPct, stopLossPct: a.stopLossPct });
+    await mutate(api.book.bought, { owner: team.owner, strategyId: strategyId(a.strategyId), token: a.token, symbol: a.symbol, tokens: f.tokens.toString(), wei: f.wei.toString(), hash: f.hash, takeProfitPct: a.takeProfitPct, stopLossPct: a.stopLossPct, trailingStopPct: a.trailingStopPct });
     return f;
   }
   const held = await ex.tokenBalance(team.wallet, a.token);

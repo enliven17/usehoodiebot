@@ -11,7 +11,7 @@ import s from "./app.module.css";
 
 const EASE = [0.2, 0.7, 0.2, 1] as const;
 const DRAFT = "hoodie-application";
-const HOSTS = ["hoodiebot", "research", "sniper", "trader", "launch"] as const;
+const HOSTS = ["hoodiebot", "research", "sniper", "shield", "trader", "launch"] as const;
 
 const load = (): Answers => {
   try {

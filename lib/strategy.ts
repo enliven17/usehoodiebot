@@ -17,6 +17,10 @@ export type Spec = {
   minBuySellRatio?: number;
   takeProfitPct?: number;
   stopLossPct?: number;
+  /** sells once the price falls this far from the highest it reached while held */
+  trailingStopPct?: number;
+  /** ShieldBot's score (0–100) a token needs; the entry grows from half size at the bar to full size at 100 */
+  minSafetyScore?: number;
 };
 
 export const SPEC_LIMITS = { sizeEth: [0.0005, 1], slippageBps: [50, 1500], maxOpen: [1, 10], exitPct: [5, 1000] } as const;
@@ -47,6 +51,8 @@ export function parseSpec(raw: unknown): Spec {
     // At least 5% either way: a fresh position already reads about 2–3% down from the fees on the way in and out.
     takeProfitPct: exitPct(r.takeProfitPct),
     stopLossPct: exitPct(r.stopLossPct) !== undefined ? Math.min(99, exitPct(r.stopLossPct)!) : undefined,
+    trailingStopPct: exitPct(r.trailingStopPct) !== undefined ? Math.min(99, exitPct(r.trailingStopPct)!) : undefined,
+    minSafetyScore: pos(r.minSafetyScore) === undefined ? undefined : Math.round(Math.min(100, pos(r.minSafetyScore)!)),
   };
 }
 
@@ -69,13 +75,27 @@ export function rejects(s: Spec, c: Candidate): string | null {
   return null;
 }
 
-/** Whether an open position should be closed at `priceEth` (ETH per token now) against its entry. */
-export function exitReason(s: Spec, entryEth: number, priceEth: number): "take profit" | "stop loss" | null {
+export type Exits = Pick<Spec, "takeProfitPct" | "stopLossPct" | "trailingStopPct">;
+
+/**
+ * Whether an open position should be closed at `priceEth` (ETH per token now) against its entry, and for a trailing
+ * stop against `peakEth`, the highest price seen while it was held.
+ */
+export function exitReason(s: Exits, entryEth: number, priceEth: number, peakEth = 0): "take profit" | "stop loss" | "trailing stop" | null {
   if (!(entryEth > 0) || !(priceEth > 0)) return null;
   const change = (priceEth / entryEth - 1) * 100;
   if (s.takeProfitPct !== undefined && change >= s.takeProfitPct) return "take profit";
   if (s.stopLossPct !== undefined && change <= -s.stopLossPct) return "stop loss";
+  const peak = Math.max(peakEth, entryEth);
+  if (s.trailingStopPct !== undefined && peak > entryEth && (priceEth / peak - 1) * 100 <= -s.trailingStopPct) return "trailing stop";
   return null;
+}
+
+/** The entry for a token ShieldBot scored: half size at the strategy's bar, full size at 100; full size with no bar. */
+export function sizeFor(s: Spec, score: number): number {
+  if (s.minSafetyScore === undefined || s.minSafetyScore >= 100) return s.sizeEth;
+  const over = Math.max(0, Math.min(1, (score - s.minSafetyScore) / (100 - s.minSafetyScore)));
+  return Math.max(SPEC_LIMITS.sizeEth[0], Number((s.sizeEth * (0.5 + 0.5 * over)).toFixed(6)));
 }
 
 export type Tone = "up" | "down";
@@ -97,6 +117,8 @@ export function ruleRows(s: Spec): RuleRow[] {
   if (s.minBuySellRatio !== undefined) out.push(["Buys vs sells", `${s.minBuySellRatio}x or more`]);
   if (s.takeProfitPct !== undefined) out.push(["Take profit", `+${s.takeProfitPct}%`, "up"]);
   if (s.stopLossPct !== undefined) out.push(["Stop loss", `-${s.stopLossPct}%`, "down"]);
+  if (s.trailingStopPct !== undefined) out.push(["Trailing stop", `-${s.trailingStopPct}% from the high`, "down"]);
+  if (s.minSafetyScore !== undefined) out.push(["Safety", `${s.minSafetyScore}/100 or more, size grows with it`]);
   return out;
 }
 
@@ -106,11 +128,13 @@ export const describe = (s: Spec): string[] => ruleRows(s).map(([k, v]) => `${k}
 export const WATCH_LABEL: Record<Spec["watch"], string> = { new: "New Pons launches", curve: "Tokens on the Pons curve", graduated: "Graduated Uniswap v4 pools", all: "All Pons tokens" };
 
 /** Take profit and stop loss in percent, both optional; a message when one is out of range. */
-export function exitsOf(b: { takeProfitPct?: unknown; stopLossPct?: unknown }): { takeProfitPct?: number; stopLossPct?: number } | string {
+export function exitsOf(b: { takeProfitPct?: unknown; stopLossPct?: unknown; trailingStopPct?: unknown }): { takeProfitPct?: number; stopLossPct?: number; trailingStopPct?: number } | string {
   const pct = (v: unknown, max: number) => (v === undefined || v === null || v === "" ? undefined : Number(v) >= SPEC_LIMITS.exitPct[0] && Number(v) <= max ? Number(v) : NaN);
   const takeProfitPct = pct(b.takeProfitPct, SPEC_LIMITS.exitPct[1]);
   const stopLossPct = pct(b.stopLossPct, 99);
   if (Number.isNaN(takeProfitPct)) return "Take profit goes from +5% to +1000%.";
   if (Number.isNaN(stopLossPct)) return "Stop loss goes from -5% to -99%.";
-  return { takeProfitPct, stopLossPct };
+  const trailingStopPct = pct(b.trailingStopPct, 99);
+  if (Number.isNaN(trailingStopPct)) return "Trailing stop goes from 5% to 99%.";
+  return { takeProfitPct, stopLossPct, trailingStopPct };
 }

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import type { Candidate } from "./chain/market";
-import { exitReason, exitsOf, parseSpec, rejects, ruleRows } from "./strategy";
+import { exitReason, exitsOf, parseSpec, rejects, ruleRows, sizeFor } from "./strategy";
 
 const c = (o: Partial<Candidate>): Candidate => ({ token: "0x0000000000000000000000000000000000000001", symbol: "X", venue: "curve", priceEth: 1e-9, ageMinutes: 30, mcapUsd: 20_000, liquidityUsd: 8_000, curvePct: 10, buys1h: 30, sells1h: 10, ...o });
 
@@ -48,8 +48,24 @@ test("ruleRows reads back in words, ASCII values only", () => {
 });
 
 test("exitsOf keeps exits in range and names the bad one", () => {
-  assert.deepEqual(exitsOf({ takeProfitPct: 80, stopLossPct: "35" }), { takeProfitPct: 80, stopLossPct: 35 });
-  assert.deepEqual(exitsOf({}), { takeProfitPct: undefined, stopLossPct: undefined });
+  assert.deepEqual(exitsOf({ takeProfitPct: 80, stopLossPct: "35", trailingStopPct: 20 }), { takeProfitPct: 80, stopLossPct: 35, trailingStopPct: 20 });
+  assert.deepEqual(exitsOf({}), { takeProfitPct: undefined, stopLossPct: undefined, trailingStopPct: undefined });
   assert.match(exitsOf({ stopLossPct: 100 }) as string, /Stop loss/);
   assert.match(exitsOf({ takeProfitPct: 2 }) as string, /Take profit/);
+});
+
+test("a trailing stop sells once the price falls that far from its high, never below entry's own high", () => {
+  const trail = { trailingStopPct: 25 };
+  assert.equal(exitReason(trail, 1, 1.6, 2), null, "2 to 1.6 is -20%, inside a 25% trail");
+  assert.equal(exitReason(trail, 1, 1.5, 2), "trailing stop");
+  assert.equal(exitReason(trail, 1, 1.7, 2), null);
+  assert.equal(exitReason(trail, 1, 0.8, 0), null, "never rose: the stop loss is what covers this");
+});
+
+test("sizeFor grows the entry from half at the safety bar to full at 100", () => {
+  const s = parseSpec({ watch: "new", sizeEth: 0.02, minSafetyScore: 60 });
+  assert.equal(sizeFor(s, 60), 0.01);
+  assert.equal(sizeFor(s, 80), 0.015);
+  assert.equal(sizeFor(s, 100), 0.02);
+  assert.equal(sizeFor(parseSpec({ watch: "new", sizeEth: 0.02 }), 40), 0.02);
 });
