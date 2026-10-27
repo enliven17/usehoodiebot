@@ -64,11 +64,15 @@ export async function complete(a: { messages: ChatMessage[]; tools: ToolDef[]; m
         failures.push(`${id} ${res.status}`);
         continue;
       }
-      const body = (await res.json().catch(() => null)) as { choices?: Array<{ message?: { content?: string | null; tool_calls?: ToolCall[] } }>; error?: { message?: string } } | null;
+      // Gemini wraps its errors in an array: [{ error: { message } }]
+      const raw = (await res.json().catch(() => null)) as unknown;
+      const body = (Array.isArray(raw) ? raw[0] : raw) as { choices?: Array<{ message?: { content?: string | null; tool_calls?: ToolCall[] } }>; error?: { message?: string } } | null;
       const msg = body?.choices?.[0]?.message;
       // A 4xx here is this model's problem (an invented tool name, an unknown slug): move on, no cooldown.
       if (!res.ok || !msg) {
         failures.push(`${id} ${res.status} ${(body?.error?.message ?? "").slice(0, 80)}`);
+        // out of credit (402) or quota: this key will not work for a while either
+        if (res.status === 402) cooldown.set(id, Date.now() + p.cooldownMs);
         continue;
       }
       const toolCalls = (msg.tool_calls ?? []).map((c, i) => ({ id: c.id || `call_${Date.now()}_${i}`, type: "function" as const, function: { name: c.function.name, arguments: c.function.arguments || "{}" } }));
