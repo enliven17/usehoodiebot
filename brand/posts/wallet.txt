@@ -1,0 +1,5 @@
+Your team trades from its own wallet, on a short leash.
+
+Deny by default: Pons curves, the Uniswap v4 router and Permit2 on Robinhood Chain. Everything else is refused before it is signed. ETH only ever leaves to you.
+
+usehoodiebot.com
