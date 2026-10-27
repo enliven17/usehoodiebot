@@ -1,5 +1,6 @@
 "use client";
 
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useState } from "react";
 
 import { Hoodie } from "@/components/Hoodie";
@@ -12,10 +13,12 @@ import s from "./app.module.css";
 
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 const eth = (n: number | string | null, d = 4) => (n === null ? "–" : `${Number(n).toFixed(d)} ETH`);
+const signed = (n: number) => `${n >= 0 ? "+" : "-"}${Math.abs(n).toFixed(4)} ETH`;
 
 export function Approvals({ snap, onChange }: { snap: Snapshot; onChange: () => void }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const reduce = useReducedMotion();
   const pending = snap.approvals.filter((a) => a.status === "pending");
   const recent = snap.approvals.filter((a) => a.status !== "pending").slice(0, 4);
   if (!pending.length && !recent.length) return null;
@@ -39,8 +42,17 @@ export function Approvals({ snap, onChange }: { snap: Snapshot; onChange: () => 
   return (
     <section className={s.block} aria-labelledby="approvals-h">
       <h2 id="approvals-h" className={s.blockTitle}>Waiting for you {pending.length ? <span className={s.count}>{pending.length}</span> : null}</h2>
+      <AnimatePresence initial={false}>
       {pending.map((a) => (
-        <div key={a.id} className={s.approval}>
+        <motion.div
+          key={a.id}
+          className={s.approval}
+          layout={!reduce}
+          initial={reduce ? false : { opacity: 0, y: -8, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={reduce ? { opacity: 0 } : { opacity: 0, height: 0, marginBottom: 0, paddingTop: 0, paddingBottom: 0, transition: { duration: 0.25 } }}
+          transition={{ duration: 0.3, ease: [0.2, 0.7, 0.2, 1] }}
+        >
           <Hoodie member="trader" size={34} mood="working" />
           <div className={s.approvalBody}>
             <p className={s.approvalWhat}>{a.kind === "buy" ? `Buy ${a.eth} ETH of ${a.symbol}` : `Sell all ${a.symbol}`}</p>
@@ -51,8 +63,9 @@ export function Approvals({ snap, onChange }: { snap: Snapshot; onChange: () => 
               <StatusButton className="btn btn-primary" onClick={() => decide(a.id, true)} successLabel="Filled">Approve</StatusButton>
             </div>
           </div>
-        </div>
+        </motion.div>
       ))}
+      </AnimatePresence>
       {recent.map((a) => (
         <p key={a.id} className={s.recent}>
           <span>{a.kind === "buy" ? "Buy" : "Sell"} {a.symbol}</span>
@@ -90,6 +103,13 @@ export function Wallet({ snap, onChange }: { snap: Snapshot; onChange: () => voi
         <div><span className="faint">To trade</span><strong className="num">{eth(snap.spendableEth)}</strong></div>
         <div><span className="faint">In positions</span><strong className="num">{eth(value)}</strong></div>
       </div>
+      {snap.pnl.closedCount || snap.positions.length ? (
+        <div className={s.pnl}>
+          <span className="faint">Profit and loss</span>
+          <span className={`num ${snap.pnl.realizedEth >= 0 ? "up" : "down"}`} title="From closed positions">{signed(snap.pnl.realizedEth)} realized</span>
+          <span className={`num ${snap.pnl.unrealizedEth >= 0 ? "up" : "down"}`} title="Open positions at the live sell quote">{signed(snap.pnl.unrealizedEth)} open</span>
+        </div>
+      ) : null}
       <div className={s.addressRow}>
         <a className="num" href={addressUrl(snap.wallet)} target="_blank" rel="noopener">{short(snap.wallet)}</a>
         <button
@@ -162,21 +182,14 @@ export function Strategies({ snap, onChange }: { snap: Snapshot; onChange: () =>
   );
 }
 
-export function Activity({ snap }: { snap: Snapshot }) {
-  if (!snap.trades.length) return null;
+/** Placeholder blocks while the first snapshot loads, shaped like the real panels so nothing jumps. */
+export function SideSkeleton() {
   return (
-    <section className={s.block} aria-labelledby="act-h">
-      <h2 id="act-h" className={s.blockTitle}>Activity</h2>
-      <ul className={s.list}>
-        {snap.trades.map((t) => (
-          <li key={t.hash + t.side} className={s.item}>
-            <span>{t.side === "buy" ? "Bought" : "Sold"} {t.symbol}</span>
-            <span className="num faint">{eth(t.eth)}</span>
-            <a className="num" href={txUrl(t.hash)} target="_blank" rel="noopener">{short(t.hash)}</a>
-          </li>
-        ))}
-      </ul>
-    </section>
+    <div aria-hidden>
+      {[132, 196, 240].map((h, i) => (
+        <div key={i} className={`${s.block} ${s.skeleton}`} style={{ height: h, animationDelay: `${i * 120}ms` }} />
+      ))}
+    </div>
   );
 }
 

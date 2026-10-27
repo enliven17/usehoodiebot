@@ -2,18 +2,24 @@
 
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Field, fieldEvent } from "@/components/Field";
 import { Hoodie, type Mood } from "@/components/Hoodie";
 import { Mark } from "@/components/Logo";
 import { ShimmeringText } from "@/components/ui/ShimmeringText";
-import { TEAM, type Member } from "@/lib/team";
 
 import { api, type Line, type Snapshot } from "./api";
 import s from "./app.module.css";
-import { Activity, Approvals, Positions, Strategies, TeamStrip, Wallet } from "./Side";
+import { Message } from "./Message";
+import { Approvals, Positions, SideSkeleton, Strategies, TeamStrip, Wallet } from "./Side";
 import { SignIn } from "./SignIn";
+import { Timeline } from "./Timeline";
+
+/** How often the side panel refreshes: the strategy tick runs every minute, approvals should show up quickly. */
+const POLL_MS = 8_000;
+const EASE = [0.2, 0.7, 0.2, 1] as const;
 
 const STARTERS = [
   ["scan", "What is moving on Pons right now?"],
@@ -21,11 +27,6 @@ const STARTERS = [
   ["strategy", "Watch new launches under $60k mcap with 5k liquidity and buys beating sells. 0.01 ETH each, ask me first, take profit at 80%, stop at 35%."],
   ["launch", "What do I need to launch a token on Pons?"],
 ] as const;
-
-const STEP_LABEL: Record<string, string> = {
-  scan_market: "scanned the market", research_token: "read the token", get_wallet: "checked the wallet", propose_trade: "prepared a trade",
-  create_strategy: "saved a strategy", list_strategies: "read your strategies", update_strategy: "updated a strategy", prepare_launch: "checked the launch",
-};
 
 type Panel = "chat" | "team";
 
@@ -55,8 +56,13 @@ export function App({ signedIn }: { signedIn: boolean }) {
     if (!authed) return;
     void refresh();
     api.lines().then((r) => setLines(r.lines)).catch(() => {});
-    const t = setInterval(() => !document.hidden && refresh(), 15_000);
-    return () => clearInterval(t);
+    const t = setInterval(() => !document.hidden && refresh(), POLL_MS);
+    const onFocus = () => void refresh();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      clearInterval(t);
+      window.removeEventListener("focus", onFocus);
+    };
   }, [authed, refresh]);
 
   useEffect(() => {
@@ -95,9 +101,9 @@ export function App({ signedIn }: { signedIn: boolean }) {
     return (
       <>
         <Field />
-        <main className={s.solo}>
+        <motion.main className={s.solo} initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.45, ease: EASE }}>
           <SignIn onDone={() => setAuthed(true)} />
-        </main>
+        </motion.main>
       </>
     );
   }
@@ -106,7 +112,7 @@ export function App({ signedIn }: { signedIn: boolean }) {
   const mood: Mood = thinking ? "thinking" : pending ? "listening" : error ? "sad" : "idle";
 
   return (
-    <div className={s.shell} data-panel={panel}>
+    <motion.div className={s.shell} data-panel={panel} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5, ease: EASE }}>
       <Field targetId="composer" />
       <nav className={s.rail} aria-label="App">
         <Link href="/" className={s.railBrand} aria-label="HOODIEBOT home"><Mark size={26} /></Link>
@@ -128,7 +134,7 @@ export function App({ signedIn }: { signedIn: boolean }) {
       <main className={s.main}>
         <div className={s.thread} aria-live="polite">
           {!lines.length ? (
-            <div className={s.empty}>
+            <motion.div className={s.empty} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.1, ease: EASE }}>
               <TeamStrip />
               <h1 className={s.hello}>What should the team <span className="grad">watch</span>?</h1>
               <ul className={s.chips}>
@@ -136,16 +142,18 @@ export function App({ signedIn }: { signedIn: boolean }) {
                   <li key={k}><button type="button" className="chip" onClick={() => send(q)}><span className="slash">/</span>{k}</button></li>
                 ))}
               </ul>
-            </div>
+            </motion.div>
           ) : (
             lines.map((l) => <Message key={l.id} line={l} />)
           )}
-          {thinking ? (
-            <div className={s.msg}>
-              <Hoodie size={34} mood="thinking" />
-              <p className={s.bubble}><ShimmeringText text="The team is on it…" /></p>
-            </div>
-          ) : null}
+          <AnimatePresence>
+            {thinking ? (
+              <motion.div key="thinking" className={s.msg} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: { duration: 0.15 } }} transition={{ duration: 0.3, ease: EASE }}>
+                <Hoodie size={34} mood="thinking" />
+                <p className={s.bubble}><ShimmeringText text="The team is on it…" /></p>
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
           <div ref={bottom} />
         </div>
 
@@ -183,46 +191,24 @@ export function App({ signedIn }: { signedIn: boolean }) {
         </form>
       </main>
 
-      <aside className={s.side} aria-label="Team">
-        {snap ? (
-          <>
-            <Approvals snap={snap} onChange={refresh} />
-            <Wallet snap={snap} onChange={refresh} />
-            <Positions snap={snap} />
-            <Strategies snap={snap} onChange={refresh} />
-            <Activity snap={snap} />
-          </>
-        ) : (
-          <p className="faint" style={{ padding: 20 }}>Loading your team…</p>
-        )}
+      <aside className={s.side} aria-label="Team" aria-busy={!snap}>
+        <AnimatePresence mode="wait" initial={false}>
+          {snap ? (
+            <motion.div key="panels" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: EASE }}>
+              <Approvals snap={snap} onChange={refresh} />
+              <Wallet snap={snap} onChange={refresh} />
+              <Timeline snap={snap} />
+              <Positions snap={snap} />
+              <Strategies snap={snap} onChange={refresh} />
+            </motion.div>
+          ) : (
+            <motion.div key="skeleton" exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+              <SideSkeleton />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </aside>
-    </div>
+    </motion.div>
   );
 }
 
-function Message({ line }: { line: Line }) {
-  if (line.who === "me") {
-    return (
-      <div className={`${s.msg} ${s.me}`}>
-        <p className={s.bubble}>{line.text}</p>
-      </div>
-    );
-  }
-  const members = [...new Set(line.steps.map((st) => st.member))] as Member[];
-  const lead = members.find((m) => m !== "hoodiebot") ?? "hoodiebot";
-  return (
-    <div className={s.msg}>
-      <Hoodie member={lead} size={34} mood="idle" />
-      <div className={s.bubble}>
-        {line.steps.length ? (
-          <p className={s.steps}>
-            {line.steps.map((st, i) => (
-              <span key={i}>{TEAM[st.member as Member]?.name ?? "HOODIEBOT"} {STEP_LABEL[st.tool] ?? st.tool}</span>
-            ))}
-          </p>
-        ) : null}
-        {line.text.split(/\n{2,}/).map((p, i) => <p key={i} className={s.para}>{p}</p>)}
-      </div>
-    </div>
-  );
-}

@@ -117,3 +117,37 @@
 .walletDot { width: 22px; height: 22px; border-radius: 7px; background: linear-gradient(135deg, var(--cyan-200), var(--violet-200)) }
 .linkish { padding: 4px 8px; font-size: 13px; color: var(--text-muted); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--border-strong) }
 .linkish:hover { color: var(--text) }
+
+/* rich text in replies */
+.list2 { margin: 0 0 8px; padding-left: 18px }
+.list2 li { margin: 2px 0 }
+.list2 li::marker { color: var(--text-faint) }
+.bubble strong { color: var(--text); font-weight: 500 }
+.code { padding: 1px 5px; border-radius: 6px; background: rgba(255, 255, 255, .06); font-family: var(--font-mono); font-size: .88em; color: var(--text) }
+.stepChip { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap }
+.stepChip::before { content: ""; width: 3px; height: 10px; border-radius: 2px; background: var(--eye) }
+
+/* decisions */
+.timeline { position: relative; margin: 0; padding: 0; list-style: none }
+.event { position: relative; display: grid; grid-template-columns: 14px minmax(0, 1fr); gap: 10px; padding: 8px 0 }
+.event + .event { border-top: 1px solid rgba(255, 255, 255, .05) }
+.eventMark { width: 3px; height: calc(100% - 6px); margin: 3px auto 0; border-radius: 2px; background: var(--eye); opacity: .85 }
+.event[data-kind="scan"] .eventMark, .event[data-kind="research"] .eventMark, .event[data-kind="strategy"] .eventMark { opacity: .45 }
+.eventBody { min-width: 0 }
+.eventHead { display: flex; justify-content: space-between; gap: 8px; margin: 0; font-size: 12.5px }
+.eventHead strong { font-weight: 500; color: var(--text-2) }
+.eventHead time { font-family: var(--font-mono); font-size: 11.5px }
+.eventText { margin: 2px 0 0; font-size: 13.5px; line-height: 1.45; color: var(--text-2); overflow-wrap: anywhere }
+.eventMeta { display: flex; flex-wrap: wrap; gap: 12px; margin: 4px 0 0; font-size: 12px }
+.eventMeta a { color: var(--text-muted); text-decoration: none }
+.eventMeta a:hover { color: var(--text) }
+
+/* pnl */
+.pnl { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; margin: -2px 0 12px; font-size: 12.5px }
+.pnl > :first-child { width: 100% }
+
+/* skeleton */
+.skeleton { position: relative; overflow: hidden; background: rgba(9, 12, 18, .7) }
+.skeleton::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, .04) 50%, transparent 80%); animation: shimmer 1.4s var(--ease) infinite; animation-delay: inherit }
+@keyframes shimmer { to { transform: translateX(100%) } }
+@media (prefers-reduced-motion: reduce) { .skeleton::after { animation: none } }
