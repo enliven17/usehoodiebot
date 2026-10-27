@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { Hoodie } from "@/components/Hoodie";
+import { StatusButton } from "@/components/ui/StatusButton";
 import { addressUrl, txUrl } from "@/lib/chain/robinhood-urls";
 
 import { api, type Snapshot } from "./api";
@@ -18,14 +19,16 @@ export function Approvals({ snap, onChange }: { snap: Snapshot; onChange: () => 
   const recent = snap.approvals.filter((a) => a.status !== "pending").slice(0, 4);
   if (!pending.length && !recent.length) return null;
 
+  /** Throws when the trade did not fill, so the Approve button goes back to idle instead of showing a check. */
   async function decide(id: string, yes: boolean) {
     setBusy(id);
     setError(null);
     try {
       const r = await api.decide(id, yes);
-      if (r.status === "failed") setError(r.result?.error ?? "The trade failed.");
+      if (r.status === "failed") throw new Error(r.result?.error ?? "The trade failed.");
     } catch (err) {
       setError((err as Error).message);
+      throw err;
     } finally {
       setBusy(null);
       onChange();
@@ -43,10 +46,8 @@ export function Approvals({ snap, onChange }: { snap: Snapshot; onChange: () => 
             <p className={s.approvalWhy}>{a.reason}</p>
             <div className={s.approvalActions}>
               <a className="btn" href={addressUrl(a.token)} target="_blank" rel="noopener">Token</a>
-              <button type="button" className="btn" disabled={busy === a.id} onClick={() => decide(a.id, false)}>Skip</button>
-              <button type="button" className="btn btn-primary" disabled={busy === a.id} onClick={() => decide(a.id, true)}>
-                {busy === a.id ? "Trading…" : "Approve"}
-              </button>
+              <button type="button" className="btn" disabled={busy === a.id} onClick={() => decide(a.id, false).catch(() => {})}>Skip</button>
+              <StatusButton className="btn btn-primary" onClick={() => decide(a.id, true)} successLabel="Filled">Approve</StatusButton>
             </div>
           </div>
         </div>

@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Field, fieldEvent } from "@/components/Field";
 import { Hoodie, type Mood } from "@/components/Hoodie";
 import { Mark } from "@/components/Logo";
+import { ShimmeringText } from "@/components/ui/ShimmeringText";
 import { TEAM, type Member } from "@/lib/team";
 
 import { api, type Line, type Snapshot } from "./api";
@@ -142,7 +143,7 @@ export function App({ signedIn }: { signedIn: boolean }) {
           {thinking ? (
             <div className={s.msg}>
               <Hoodie size={34} mood="thinking" />
-              <p className={`${s.bubble} faint`}>Working on it…</p>
+              <p className={s.bubble}><ShimmeringText text="The team is on it…" /></p>
             </div>
           ) : null}
           <div ref={bottom} />
