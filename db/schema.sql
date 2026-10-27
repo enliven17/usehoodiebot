@@ -4,6 +4,8 @@ create table if not exists teams (
   wallet text not null unique,
   wallet_id text not null,
   policy_id text not null,
+  -- one transaction at a time per wallet (nonces): a lease, since the HTTP driver holds no session
+  busy_until timestamptz,
   created_at timestamptz not null default now()
 );
 
@@ -77,3 +79,5 @@ create table if not exists trades (
   hash text not null,
   created_at timestamptz not null default now()
 );
+
+alter table teams add column if not exists busy_until timestamptz;
