@@ -6,8 +6,11 @@
  *     so curves are matched by function and recipient, not address);
  *   - approve a spender (a curve or Permit2 pulls the tokens on a sell) or let Permit2 hand the router an allowance;
  *   - send to the owner or the treasury (the shutdown sweep).
+ * Every rule but the owner payout also caps the ETH it may carry: nothing on sells, approvals, sweeps, Permit2 and the
+ * escrow; at most MAX_TRADE_WEI on a buy or a router swap; at most MAX_LAUNCH_WEI to the factory. So even a signer
+ * steered into a hostile call (a fake curve, crafted router calldata) cannot move more than one trade's worth.
  * ponytail: approve is open to any spender; it exposes only the memecoins the wallet holds, never its ETH. Narrow it
- * with a condition set of known curves if that ever matters.
+ * with a condition set of known curves if that ever matters. The router rule matches the address, not the commands.
  * Docs: https://docs.privy.io/controls/policies/example-policies/ethereum.md (ethereum_transaction to/chain_id,
  * ethereum_calldata <function>.<argument> and function_name, with an abi).
  */
@@ -15,7 +18,11 @@ import { ROBINHOOD_CHAIN } from "./robinhood";
 import { PONS_FACTORY, PONS_FEE_ESCROW } from "./pons";
 import { PERMIT2, UNIVERSAL_ROUTER } from "./v4";
 
-type Condition = { field_source: "ethereum_transaction" | "ethereum_calldata"; field: string; operator: "eq" | "in"; value: string | string[]; abi?: unknown[] };
+/** The largest buy a strategy may size (lib/strategy.ts SPEC_LIMITS), and headroom over the live 0.0005 ETH launch fee. */
+export const MAX_TRADE_WEI = 10n ** 18n;
+export const MAX_LAUNCH_WEI = 10n ** 16n;
+
+type Condition = { field_source: "ethereum_transaction" | "ethereum_calldata"; field: string; operator: "eq" | "in" | "lte"; value: string | string[]; abi?: unknown[] };
 type Rule = { name: string; method: "eth_signTransaction"; conditions: Condition[]; action: "ALLOW" };
 export type EvmPolicyInput = { version: "1.0"; name: string; chain_type: "ethereum"; rules: Rule[] };
 
@@ -28,17 +35,23 @@ export function robinhoodAgentPolicy(wallet: string, owner: string, treasury: st
   const lower = (a: string) => a.toLowerCase();
   const rule = (name: string, ...conditions: Condition[]): Rule => ({ name, method: "eth_signTransaction", conditions: [onChain, ...conditions], action: "ALLOW" });
   const call = (field: string, operator: "eq" | "in", value: string | string[], abi: unknown[]): Condition => ({ field_source: "ethereum_calldata", field, operator, value, abi });
+  const to = (...addresses: string[]): Condition => ({ field_source: "ethereum_transaction", field: "to", operator: "in", value: addresses.map(lower) });
+  // Privy compares value numerically, written as hex wei.
+  const valueAtMost = (wei: bigint): Condition => ({ field_source: "ethereum_transaction", field: "value", operator: "lte", value: `0x${wei.toString(16)}` });
+  const noValue = valueAtMost(0n);
   return {
     version: "1.0",
     name: `HOODIEBOT ${wallet.slice(0, 10)}`,
     chain_type: "ethereum",
     rules: [
-      rule("Pons factory, fee escrow, router, Permit2", { field_source: "ethereum_transaction", field: "to", operator: "in", value: [PONS_FACTORY, PONS_FEE_ESCROW, UNIVERSAL_ROUTER, PERMIT2].map(lower) }),
-      rule("Curve buy to itself", call("buy.recipient", "eq", lower(wallet), CURVE_ABI)),
-      rule("Curve sell to itself", call("sell.recipient", "eq", lower(wallet), CURVE_ABI)),
-      rule("Sweep its curve's fees", call("function_name", "eq", "sweepFees", CURVE_ABI)),
-      rule("Approve a token spender", call("function_name", "eq", "approve", APPROVE_ABI)),
-      rule("Pay the owner or the treasury", { field_source: "ethereum_transaction", field: "to", operator: "in", value: [owner, ...(treasury ? [treasury] : [])].map(lower) }),
+      rule("Pons factory launch", to(PONS_FACTORY), valueAtMost(MAX_LAUNCH_WEI)),
+      rule("Fee escrow claim, Permit2", to(PONS_FEE_ESCROW, PERMIT2), noValue),
+      rule("Uniswap v4 router swap", to(UNIVERSAL_ROUTER), valueAtMost(MAX_TRADE_WEI)),
+      rule("Curve buy to itself", call("buy.recipient", "eq", lower(wallet), CURVE_ABI), valueAtMost(MAX_TRADE_WEI)),
+      rule("Curve sell to itself", call("sell.recipient", "eq", lower(wallet), CURVE_ABI), noValue),
+      rule("Sweep its curve's fees", call("function_name", "eq", "sweepFees", CURVE_ABI), noValue),
+      rule("Approve a token spender", call("function_name", "eq", "approve", APPROVE_ABI), noValue),
+      rule("Pay the owner or the treasury", to(owner, ...(treasury ? [treasury] : []))),
     ],
   };
 }

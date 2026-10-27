@@ -88,7 +88,7 @@ export async function decide(owner: string, id: string, yes: boolean, slippageBp
 /** Auto mode: trade now under the lease; null when the wallet is busy (the tick retries later). */
 export const tradeNow = (team: Team, a: Parameters<typeof trade>[1]) => withLease(team.owner, () => trade(team, a));
 
-/** Sends ETH back to the owner. The wallet's policy refuses any other destination anyway. */
+/** Sends ETH back to the owner: the only destination the policy lets a plain transfer reach without a cap. */
 export async function withdraw(team: Team, wei: bigint | "all"): Promise<string> {
   const ex = getExecutor();
   const spendable = await ex.spendable(team.wallet);
