@@ -40,7 +40,7 @@ export function Product() {
           <ul className={s.points}>
             <li>
               <h3>Research that is reused</h3>
-              <p>ResearchBot reads holders, curve progress, liquidity and the last hour of buys and sells. TraderBot trades off that read instead of starting over.</p>
+              <p>ResearchBot reads curve progress, liquidity, market cap and the last hour of buys and sells. TraderBot trades off that read instead of starting over.</p>
             </li>
             <li>
               <h3>Desktop or phone</h3>
