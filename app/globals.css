@@ -60,7 +60,7 @@ kbd { font-family: var(--font-mono); font-size: 12px; font-weight: 400 }
 .btn-primary:hover { color: var(--ink-950); border-color: transparent; filter: brightness(1.06) }
 .btn-lg { height: 48px; padding: 0 22px; font-size: 15px; border-radius: 14px }
 
-.chip { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--border); background: rgba(7, 10, 16, .62); font-family: var(--font-mono); font-size: 13px; color: var(--text-muted); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); transition: color .15s, border-color .15s, background-color .15s }
+.chip { display: inline-flex; align-items: center; min-height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--border); background: rgba(7, 10, 16, .62); font-family: var(--font-mono); font-size: 13px; color: var(--text-muted); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); transition: color .15s, border-color .15s, background-color .15s }
 .chip:hover { color: var(--text); border-color: var(--border-strong); background: rgba(14, 19, 28, .8) }
 .chip .slash { color: var(--accent) }
 
@@ -98,3 +98,9 @@ dialog[open] { animation: dlg-in .18s var(--ease) }
   .btn, .chip, .tool, .card, dialog { border: 1px solid CanvasText }
   :focus-visible { outline: 2px solid Highlight }
 }
+
+/* rotating headline: every line shares one grid cell, so the block never jumps */
+.hl { display: grid }
+.hl-line { grid-area: 1 / 1; align-self: center; visibility: hidden; text-wrap: balance }
+.hl-line[data-on] { visibility: visible }
+.hl-w { display: inline-block; padding: .06em 0; will-change: transform, filter, opacity }
