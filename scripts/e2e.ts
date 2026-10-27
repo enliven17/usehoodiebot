@@ -42,6 +42,21 @@ console.log("    reply", reply.text.slice(0, 300).replace(/\n/g, " "));
 const snap = (await step("snapshot", () => call("/api/team"))) as { events: Array<{ member: string; text: string }> };
 console.log("    events", snap.events.map((e) => `${e.member}: ${e.text}`).slice(0, 4));
 
+// past chats: start a new one, the first shows up in the list and reopens with its lines
+const first = (await step("new chat", () => call("/api/chat/new", { method: "POST" })).then(() => call("/api/chat/threads"))) as { threads: Array<{ thread: number; title: string }> };
+console.log("    chats", first.threads.map((t) => `${t.thread}: ${t.title.slice(0, 40)}`));
+const reopened = (await step("reopen chat", () => call("/api/chat/open", { method: "POST", json: { thread: first.threads[0]!.thread } }))) as { lines: unknown[] };
+if (!reopened.lines.length) throw new Error("reopened chat is empty");
+
+// trade screen: token list, candles for the busiest one, and a hand buy refused for lack of ETH (nothing is sent)
+const market = (await step("market list", () => call("/api/market"))) as { tokens: Array<{ token: string; symbol: string }> };
+const pick = market.tokens[0]!;
+const view = (await step(`chart ${pick.symbol}`, () => call(`/api/market/${pick.token}?tf=5m`))) as { candles: unknown[]; market: { pool: string } | null };
+console.log("    candles", view.candles.length, "pool", view.market?.pool);
+const refused = await call("/api/trade", { method: "POST", json: { side: "buy", token: pick.token, symbol: pick.symbol, eth: "0.001" } }).catch((e: Error) => e.message);
+if (typeof refused !== "string" || !/ETH to trade/.test(refused)) throw new Error(`hand buy was not refused: ${JSON.stringify(refused)}`);
+console.log("ok  hand buy refused:", refused.slice(0, 90));
+
 // --strategy: save a loose strategy through chat, wait for the minute tick to match a token, then approve it. The
 // throwaway wallet holds no ETH, so the approval must fail safely with the balance message (no transaction is sent).
 if (process.argv.includes("--strategy")) {
