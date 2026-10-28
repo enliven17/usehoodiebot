@@ -1,0 +1,5 @@
+Meet Hoodie: your own trading team on Robinhood Chain.
+
+Say what to buy in plain words. ShieldBot checks every token first. Autopilot trades only inside the budget you set.
+
+Applications are open: hoodiebot.vercel.app

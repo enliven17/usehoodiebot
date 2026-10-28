@@ -58,3 +58,9 @@ Not used, on purpose: small all-caps eyebrows above headlines, glowing status do
 ## Posts
 
 `posts/*.png` (1600×900) with their captions in `posts/*.txt`.
+
+## Launch film
+
+`video/hoodie-launch.mp4` (1920×1080, 30 fps, about 31 s) with its caption in `posts/launch.txt`. The scenes live in
+`components/promo/` and play at `/promo` on the dev server; `node brand/promo.mjs` records them through Chrome's
+screencast and encodes with ffmpeg.
