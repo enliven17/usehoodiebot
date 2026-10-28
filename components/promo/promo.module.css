@@ -54,4 +54,3 @@
 /* outro */
 .wordmark { display: inline-flex; align-items: center; gap: 34px; font-size: 150px; font-weight: 500; letter-spacing: -.035em }
 .cta { margin: 10px 0 0; padding: 22px 44px; border-radius: 22px; background: linear-gradient(135deg, var(--cyan-200), var(--violet-200)); color: var(--ink-950); font-size: 38px; font-weight: 500 }
-.url { margin: 0; font-size: 28px; color: var(--text-muted) }

@@ -184,7 +184,6 @@ function Outro() {
       <motion.p className={s.cta} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6, duration: 0.6 }}>
         Apply for access
       </motion.p>
-      <motion.p className={`num ${s.url}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1, duration: 0.6 }}>hoodiebot.vercel.app</motion.p>
     </motion.section>
   );
 }
