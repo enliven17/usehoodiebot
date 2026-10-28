@@ -37,8 +37,8 @@ export function SignIn({ onDone }: { onDone: () => void }) {
     setStep("sign");
     try {
       const owner = getAddress(addr);
-      const { nonce } = await api.nonce();
-      const signature = await signMessageAsync({ account: owner, message: signInMessage(owner, nonce) });
+      const { nonce, issuedAt } = await api.nonce();
+      const signature = await signMessageAsync({ account: owner, message: signInMessage({ domain: location.host, uri: location.origin, address: owner, nonce, issuedAt }) });
       await api.verify(owner, signature);
       setStep("team");
       // the team wallet is made only for approved owners; everyone else goes on to the application

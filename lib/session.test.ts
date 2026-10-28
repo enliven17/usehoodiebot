@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 process.env.SESSION_SECRET = "x".repeat(32);
-const { seal, unseal } = await import("./session");
+const { seal, unseal } = await import("./seal");
 
 test("session: a sealed value round-trips, a tampered or expired one does not", () => {
   const s = seal("0xabc", 1000, 0);

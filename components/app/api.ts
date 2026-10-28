@@ -55,7 +55,7 @@ export const api = {
   withdraw: (eth: string) => call<{ hash: string }>("/api/withdraw", { method: "POST", json: { eth } }),
   access: () => call<{ status: Access; admin: boolean; token: TokenGate }>("/api/access"),
   apply: (answers: Record<string, string | string[]>) => call<{ status: Access }>("/api/access", { method: "POST", json: { answers } }),
-  nonce: () => call<{ nonce: string }>("/api/auth/nonce"),
+  nonce: () => call<{ nonce: string; issuedAt: string }>("/api/auth/nonce"),
   verify: (address: string, signature: string) => call<{ owner: string }>("/api/auth/verify", { method: "POST", json: { address, signature } }),
   logout: () => call("/api/auth/logout", { method: "POST" }),
 };
