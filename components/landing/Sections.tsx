@@ -21,7 +21,7 @@ export function Nav({ home = false }: { home?: boolean }) {
         <Link href="/litepaper">Litepaper</Link>
       </nav>
       <div className={s.navEnd}>
-        <a className="btn" href="https://x.com/usehoodiebot" rel="noopener">X</a>
+        <a className="btn" href="https://x.com/useHoodie" rel="noopener">X</a>
         <Link className="btn btn-primary" href="/app">Open app</Link>
       </div>
     </header>
@@ -217,7 +217,7 @@ export function Footer() {
         <Link href="/litepaper">Litepaper</Link>
         <Link href="/terms">Terms</Link>
         <Link href="/privacy">Privacy</Link>
-        <a href="https://x.com/usehoodiebot" rel="noopener">X</a>
+        <a href="https://x.com/useHoodie" rel="noopener">X</a>
       </nav>
       <p>Not financial advice. Tokens on a bonding curve can go to zero in minutes; only fund the wallet with what you can lose.</p>
     </footer>

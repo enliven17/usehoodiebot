@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   title: { default: "Hoodie", template: "%s · Hoodie" },
   description: "Your private trading team on Robinhood Chain. Tell Hoodie what to watch; its specialists research, wait for the entry and trade inside your rules.",
   openGraph: { siteName: "Hoodie", type: "website", images: [{ url: "/og/home.png", width: 1200, height: 630, alt: "Hoodie, your private trading team on Robinhood Chain" }] },
-  twitter: { card: "summary_large_image", site: "@usehoodiebot" },
+  twitter: { card: "summary_large_image", site: "@useHoodie" },
 };
 
 export const viewport: Viewport = { themeColor: "#04060a", colorScheme: "dark" };
