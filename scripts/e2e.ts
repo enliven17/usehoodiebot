@@ -84,6 +84,10 @@ console.log("    steps", verdict.steps.map((x) => `${x.member}:${x.tool}`).join(
 console.log("    reply", verdict.text.slice(0, 400).replaceAll("\n", " "));
 if (!verdict.steps.some((x) => x.tool === "check_safety")) throw new Error("ShieldBot was not asked before a buy");
 // chat trading: name a token, get a card with its ticker, confirm it (refused for lack of ETH; the card stays usable)
+// paper trading is off until the owner turns it on
+const fresh = (await call("/api/team")) as { mode: string };
+if (fresh.mode !== "live") throw new Error(`a new team should trade live until paper is turned on, not ${fresh.mode}`);
+await step("turn paper trading on", () => call("/api/mode", { method: "POST", json: { mode: "paper" } }));
 const bought = (await step(`chat: buy ${pick.symbol}`, () => call("/api/chat", { method: "POST", json: { text: `buy 0.002 eth of ${pick.symbol}` } }))) as { lines: Array<{ text: string; steps: Array<{ tool: string }>; cards?: Array<{ id: string; side: string; token: string; symbol: string; ethAmount: number; safety: { score: number; blocked: boolean } | null }> }> };
 const said = bought.lines.at(-1)!;
 console.log("    steps", said.steps.map((x) => x.tool).join(", "), "· reply", said.text.slice(0, 160).replaceAll("\n", " "));
@@ -91,7 +95,7 @@ const card = said.cards?.[0];
 if (card) {
   console.log("    card", card.side, card.symbol, card.ethAmount, "ETH · shield", card.safety?.score, card.safety?.blocked ? "blocked" : "");
   if (!card.safety?.blocked) {
-    // a new team is on paper: the card fills once at the live quote, a second press is refused
+    // with paper trading on, the card fills once at the live quote and a second press is refused
     const first = (await step("card press on paper", () => call("/api/trade", { method: "POST", json: { side: card.side, token: card.token, symbol: card.symbol, eth: String(card.ethAmount), slippageBps: 300, cardId: card.id } }))) as { hash: string };
     if (!first.hash.startsWith("paper:")) throw new Error(`card filled outside paper: ${first.hash}`);
     const again = await call("/api/trade", { method: "POST", json: { side: card.side, token: card.token, symbol: card.symbol, eth: String(card.ethAmount), slippageBps: 300, cardId: card.id } }).catch((e: Error) => e.message);
@@ -113,8 +117,8 @@ const q = (await step("quote 0.001 ETH", () => call(`/api/quote?token=${pick.tok
 console.log("    quote", q);
 if (!(q.out > 0)) throw new Error("quote returned nothing");
 // paper trading by hand: buy at the live quote, the paper balance drops, the position shows, sell it all, it closes
+if (((await call("/api/team")) as { mode: string }).mode !== "paper") throw new Error("paper trading should be on after the owner turned it on");
 const before2 = (await call("/api/team")) as { mode: string; spendableEth: string };
-if (before2.mode !== "paper") throw new Error(`a new team should start on paper, not ${before2.mode}`);
 const pbuy = (await step("paper buy 0.001 ETH", () => call("/api/trade", { method: "POST", json: { side: "buy", token: pick.token, symbol: pick.symbol, eth: "0.001", slippageBps: 500, takeProfitPct: 80, stopLossPct: 35 } }))) as { hash: string };
 const mid = (await call("/api/team")) as { spendableEth: string; positions: Array<{ token: string }> };
 if (!pbuy.hash.startsWith("paper:") || !(Number(mid.spendableEth) < Number(before2.spendableEth)) || !mid.positions.some((p) => p.token === pick.token)) throw new Error("the paper buy did not book");

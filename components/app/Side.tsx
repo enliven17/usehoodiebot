@@ -145,23 +145,29 @@ export function Wallet({ snap, onChange }: { snap: Snapshot; onChange: () => voi
   );
 }
 
-/** Paper or live: the owner's switch, with a word of warning before real ETH is used. */
+/** Paper trading, off unless the owner turns it on. Turning it off goes back to the real ETH, so that asks first. */
 function Mode({ snap, onChange }: { snap: Snapshot; onChange: () => void }) {
   const [asking, setAsking] = useState(false);
+  const paper = snap.mode === "paper";
   const set = (mode: "paper" | "live") => api.mode(mode).then(() => (setAsking(false), onChange()));
   return (
     <div className={s.modeBox}>
-      <div className={s.seg} role="group" aria-label="Trading mode">
-        <button type="button" aria-pressed={snap.mode === "paper"} onClick={() => snap.mode !== "paper" && set("paper")}>Paper</button>
-        <button type="button" aria-pressed={snap.mode === "live"} onClick={() => snap.mode !== "live" && setAsking(true)}>Live</button>
+      <div className={s.modeRow}>
+        <span>
+          <strong>Paper trading</strong>
+          <span className="faint">Practice with 1 ETH at live prices</span>
+        </span>
+        <button type="button" role="switch" aria-checked={paper} aria-label="Paper trading" className={s.switch} onClick={() => (paper ? setAsking(true) : set("paper"))}>
+          <motion.span layout transition={{ type: "spring", duration: 0.4, bounce: 0.25 }} />
+        </button>
       </div>
       <AnimatePresence>
         {asking ? (
-          <motion.div className={s.modeAsk} initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} role="alertdialog" aria-label="Switch to live trading">
-            <p>Live trading uses the real ETH in the team wallet: every buy, card and strategy from here on spends it. Your paper book stays as it is.</p>
+          <motion.div className={s.modeAsk} initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} role="alertdialog" aria-label="Turn paper trading off">
+            <p>With paper trading off, trades use the real ETH in the team wallet: every buy, card and strategy from here on spends it. Your paper book stays as it is.</p>
             <div className={s.approvalActions}>
-              <button type="button" className="btn btn-primary" onClick={() => set("live")}>Switch to live</button>
-              <button type="button" className="btn" onClick={() => setAsking(false)}>Stay on paper</button>
+              <button type="button" className="btn btn-primary" onClick={() => set("live")}>Turn it off</button>
+              <button type="button" className="btn" onClick={() => setAsking(false)}>Keep practicing</button>
             </div>
           </motion.div>
         ) : null}

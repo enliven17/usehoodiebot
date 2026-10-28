@@ -28,7 +28,7 @@ const strategyId = (id: string | null | undefined) => (id ?? undefined) as Id<"s
 
 export async function getTeam(owner: string): Promise<Team | null> {
   const t = await query(api.teams.get, { owner });
-  return t ? { owner: t.owner as Address, wallet: t.wallet as Address, walletId: t.walletId, autopilot: { on: t.autopilot?.on ?? false, budgetEth: t.autopilot?.budgetEth ?? 0 }, mode: t.mode ?? "paper", paperWei: BigInt(t.paperWei ?? PAPER_START) } : null;
+  return t ? { owner: t.owner as Address, wallet: t.wallet as Address, walletId: t.walletId, autopilot: { on: t.autopilot?.on ?? false, budgetEth: t.autopilot?.budgetEth ?? 0 }, mode: t.mode ?? "live", paperWei: BigInt(t.paperWei ?? PAPER_START) } : null;
 }
 
 /** The team's own wallet, created once, under a policy that only lets it trade Pons and pay the owner. */
@@ -38,7 +38,7 @@ export async function ensureTeam(owner: Address): Promise<Team> {
   const w = await getPrivy().createWalletWithPolicy((address) => robinhoodAgentPolicy(address, owner, null, FEE_WALLET));
   // ponytail: a lost race leaves one unused, unfunded wallet in Privy; harmless.
   const t = await mutate(api.teams.create, { owner, wallet: w.address, walletId: w.id, policyId: w.policyId });
-  return { owner, wallet: t.wallet as Address, walletId: t.walletId, autopilot: { on: false, budgetEth: 0 }, mode: "paper", paperWei: PAPER_START };
+  return { owner, wallet: t.wallet as Address, walletId: t.walletId, autopilot: { on: false, budgetEth: 0 }, mode: "live", paperWei: PAPER_START };
 }
 
 /** Runs `fn` holding the team's wallet lease, or returns null when another transaction is in flight. */

@@ -439,3 +439,11 @@
 .modeBox { margin: -2px 0 14px }
 .modeAsk { overflow: hidden }
 .modeAsk p { margin: 10px 0; font-size: 13px; line-height: 1.5; color: var(--text-2) }
+.modeRow { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--border); background: rgba(255, 255, 255, .02) }
+.modeRow > span { display: flex; flex-direction: column; gap: 2px; font-size: 13.5px }
+.modeRow strong { font-weight: 500; color: var(--text) }
+.modeRow .faint { font-size: 12px }
+.switch { display: flex; flex: none; width: 44px; height: 26px; padding: 3px; border-radius: 13px; background: rgba(255, 255, 255, .12); transition: background-color .25s var(--ease) }
+.switch span { width: 20px; height: 20px; border-radius: 50%; background: var(--text) }
+.switch[aria-checked="true"] { justify-content: flex-end; background: var(--cyan-200) }
+.switch[aria-checked="true"] span { background: var(--ink-950) }

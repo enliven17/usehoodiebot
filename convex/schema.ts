@@ -21,7 +21,7 @@ export default defineSchema({
      * while it is on, and only while what they hold stays within budgetEth; otherwise they ask, like "ask" strategies.
      */
     autopilot: v.optional(v.object({ on: v.boolean(), budgetEth: v.number(), since: v.number() })),
-    /** "paper" (the default) fills every trade at live quotes against paperWei; "live" trades the team wallet. */
+    /** "live" (the default) trades the team wallet; "paper", when the owner turns it on, fills at live quotes against paperWei. */
     mode: v.optional(v.union(v.literal("paper"), v.literal("live"))),
     paperWei: v.optional(v.string()),
   }).index("by_owner", ["owner"]),
