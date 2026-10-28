@@ -60,6 +60,12 @@ Checks: `npm run typecheck`, `npm test`, `npx convex dev --once` (deploys and ty
 3. Open `/app`, sign in, send a little ETH on Robinhood Chain to the team wallet, and keep strategies on
    "Ask before each trade" until you trust them.
 
+## Credits
+
+The chart reads (`lib/ta.ts`), the strategy backtest (`lib/server/backtest.ts`), the trade journal (`lib/journal.ts`) and
+the team memory follow ideas from [Vibe-Trading](https://github.com/HKUDS/Vibe-Trading) (MIT), rebuilt in TypeScript
+for Pons candles; none of its code runs here.
+
 ## How money moves
 
 - Chat never trades: `propose_trade` creates an approval; only the owner's Approve executes it.

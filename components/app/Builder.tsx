@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import type { Preset } from "@/lib/presets";
 
-import { api } from "./api";
+import { api, type BacktestRun } from "./api";
 import s from "./app.module.css";
 
 const WATCH = [["new", "New launches"], ["curve", "On the curve"], ["graduated", "Graduated"], ["all", "All Pons"]] as const;
@@ -40,19 +40,35 @@ export function Builder({ autopilot, preset, onSaved }: { autopilot: boolean; pr
   const [v, setV] = useState<Record<string, string>>(preset ? fromPreset(preset) : DEFAULTS);
   const [mode, setMode] = useState<"ask" | "auto">("ask");
   const [busy, setBusy] = useState(false);
+  const [test, setTest] = useState<BacktestRun | "running" | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const specOf = () => {
+    const spec: Record<string, unknown> = { watch };
+    for (const f of FIELDS) {
+      const n = Number(v[f.key]);
+      if (v[f.key] && Number.isFinite(n)) spec[f.key === "slippagePct" ? "slippageBps" : f.key] = f.key === "slippagePct" ? n * 100 : n;
+    }
+    return spec;
+  };
+
+  async function runTest() {
+    setTest("running");
+    setError(null);
+    try {
+      setTest(await api.backtest({ spec: specOf() }));
+    } catch (err) {
+      setTest(null);
+      setError((err as Error).message);
+    }
+  }
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      const spec: Record<string, unknown> = { watch };
-      for (const f of FIELDS) {
-        const n = Number(v[f.key]);
-        if (v[f.key] && Number.isFinite(n)) spec[f.key === "slippagePct" ? "slippageBps" : f.key] = f.key === "slippagePct" ? n * 100 : n;
-      }
-      await api.createStrategy({ name: name.trim() || "My strategy", spec, mode });
+      await api.createStrategy({ name: name.trim() || "My strategy", spec: specOf(), mode });
       onSaved();
     } catch (err) {
       setError((err as Error).message);
@@ -95,10 +111,27 @@ export function Builder({ autopilot, preset, onSaved }: { autopilot: boolean; pr
         </div>
         {mode === "auto" && !autopilot ? <span className={s.qHint}>Autopilot is off, so it asks you until you turn Autopilot on above.</span> : null}
       </div>
+      {test && test !== "running" ? (
+        <div className={s.backtest}>
+          {test.summary ? (
+            <dl className={s.btStats}>
+              <div><dt>Trades</dt><dd className="num">{test.summary.trades}</dd></div>
+              <div><dt>Won</dt><dd className="num">{test.summary.winRatePct.toFixed(0)}%</dd></div>
+              <div><dt>Average</dt><dd className={`num ${test.summary.avgReturnPct >= 0 ? "up" : "down"}`}>{test.summary.avgReturnPct >= 0 ? "+" : ""}{test.summary.avgReturnPct.toFixed(1)}%</dd></div>
+              <div><dt>Worst</dt><dd className="num down">{test.summary.worstPct.toFixed(1)}%</dd></div>
+              <div><dt>Best</dt><dd className="num up">+{test.summary.bestPct.toFixed(1)}%</dd></div>
+              <div><dt>P&amp;L at this size</dt><dd className={`num ${test.summary.pnlEth >= 0 ? "up" : "down"}`}>{test.summary.pnlEth >= 0 ? "+" : ""}{test.summary.pnlEth.toFixed(4)} ETH</dd></div>
+            </dl>
+          ) : <p className="faint">No token had enough candles to replay right now. Try again in a minute.</p>}
+          {test.tokens.length ? <p className={`num ${s.btTokens}`}>{test.tokens.map((t) => `${t.symbol} ${t.returnPct >= 0 ? "+" : ""}${t.returnPct.toFixed(0)}% (${t.reason})`).join(" · ")}</p> : null}
+          <p className={s.qHint}>{test.note}</p>
+        </div>
+      ) : null}
       <div className={s.applyNav}>
-        <span className="faint" style={{ fontSize: 12.5 }}>ShieldBot checks every match before a buy.</span>
+        <button type="button" className="btn" disabled={test === "running"} onClick={runTest}>{test === "running" ? "Replaying recent tokens…" : "Backtest"}</button>
         <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? "Saving…" : "Save strategy"}</button>
       </div>
+      <span className="faint" style={{ fontSize: 12.5 }}>ShieldBot checks every match before a buy.</span>
       <p className={s.error} role="alert">{error}</p>
     </form>
   );

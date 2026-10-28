@@ -12,7 +12,7 @@ import { TradeCard } from "./TradeCard";
 
 const STEP_LABEL: Record<string, string> = {
   scan_market: "scanned the market", research_token: "read the token", get_wallet: "checked the wallet", propose_trade: "prepared a trade",
-  check_safety: "checked the safety", find_token: "looked the token up", offer_trade: "laid out the trade", create_strategy: "saved a strategy", list_strategies: "read your strategies", update_strategy: "updated a strategy", prepare_launch: "checked the launch",
+  check_safety: "checked the safety", find_token: "looked the token up", technical_read: "read the chart", backtest_strategy: "backtested it", review_trades: "read your journal", remember: "made a note", forget: "dropped a note", offer_trade: "laid out the trade", create_strategy: "saved a strategy", list_strategies: "read your strategies", update_strategy: "updated a strategy", prepare_launch: "checked the launch",
 };
 
 const Spans = ({ spans }: { spans: Span[] }) => (

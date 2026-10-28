@@ -61,6 +61,9 @@ export function Agents({ snap, onChange }: { snap: Snapshot; onChange: () => voi
         })}
       </ul>
 
+      <Journal snap={snap} />
+      <Memory snap={snap} onChange={onChange} />
+
       <section className={s.agentsSection}>
         <Strategies snap={snap} onChange={onChange} />
         <h2 className={s.blockTitle}>Ready-made strategies</h2>
@@ -158,6 +161,52 @@ function Autopilot({ snap, onChange }: { snap: Snapshot; onChange: () => void })
         ) : null}
       </AnimatePresence>
       <p className={s.error} role="alert">{error}</p>
+    </section>
+  );
+}
+
+/** The owner's trade journal: how their closed positions went and the habits behind it. */
+function Journal({ snap }: { snap: Snapshot }) {
+  const j = snap.journal;
+  return (
+    <section className={s.agentsSection} aria-labelledby="journal-h">
+      <h2 id="journal-h" className={s.blockTitle}>Your journal</h2>
+      {!j ? (
+        <p className="faint" style={{ fontSize: 14, margin: "0 0 14px" }}>Once positions close, TraderBot reads them here: what wins, what loses, and the habits behind it.</p>
+      ) : (
+        <>
+          <dl className={s.btStats}>
+            <div><dt>Closed</dt><dd className="num">{j.closed}</dd></div>
+            <div><dt>Won</dt><dd className="num">{j.winRatePct.toFixed(0)}%</dd></div>
+            <div><dt>P&amp;L</dt><dd className={`num ${j.pnlEth >= 0 ? "up" : "down"}`}>{j.pnlEth >= 0 ? "+" : ""}{j.pnlEth.toFixed(4)} ETH</dd></div>
+            <div><dt>Profit factor</dt><dd className="num">{j.profitFactor === null ? "–" : j.profitFactor.toFixed(2)}</dd></div>
+            <div><dt>Average win</dt><dd className="num up">{j.avgWinPct === null ? "–" : `+${j.avgWinPct.toFixed(0)}%`}</dd></div>
+            <div><dt>Average loss</dt><dd className="num down">{j.avgLossPct === null ? "–" : `${j.avgLossPct.toFixed(0)}%`}</dd></div>
+          </dl>
+          {j.habits.length ? <ul className={s.habits}>{j.habits.map((h) => <li key={h}>{h}</li>)}</ul> : null}
+        </>
+      )}
+    </section>
+  );
+}
+
+/** What the team keeps in mind across chats; the owner adds notes by saying them in chat. */
+function Memory({ snap, onChange }: { snap: Snapshot; onChange: () => void }) {
+  return (
+    <section className={s.agentsSection} aria-labelledby="memory-h">
+      <h2 id="memory-h" className={s.blockTitle}>Team memory</h2>
+      {!snap.memories.length ? (
+        <p className="faint" style={{ fontSize: 14, margin: "0 0 14px" }}>Tell Hoodie a rule once (&quot;never more than 0.05 ETH a trade&quot;) and every chat keeps it.</p>
+      ) : (
+        <ul className={s.memories}>
+          {snap.memories.map((m) => (
+            <li key={m.id}>
+              <span>{m.text}</span>
+              <button type="button" className={s.linkish} onClick={() => api.forget(m.id).then(onChange)}>Forget</button>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }

@@ -54,7 +54,7 @@ export const closed = query({
   handler: async (ctx, a) => {
     guard(a.secret);
     const rows = await ctx.db.query("positions").withIndex("by_owner_open", (q) => q.eq("owner", a.owner).gt("closedAt", 0)).collect();
-    return rows.map((p) => ({ symbol: p.symbol, costWei: p.costWei, proceedsWei: p.proceedsWei ?? "0", closedAt: p.closedAt! }));
+    return rows.map((p) => ({ symbol: p.symbol, costWei: p.costWei, proceedsWei: p.proceedsWei ?? "0", closedAt: p.closedAt!, openedAt: p._creationTime, byStrategy: !!p.strategyId }));
   },
 });
 

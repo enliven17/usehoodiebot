@@ -421,3 +421,16 @@
 .presetRules { margin: 0 0 4px; font-size: 11.5px; color: var(--text-muted) }
 @media (max-width: 65rem) { .presetsGrid { grid-template-columns: repeat(2, minmax(0, 1fr)) } }
 @media (max-width: 48rem) { .presetsGrid { grid-template-columns: minmax(0, 1fr) } }
+
+.backtest { padding: 12px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border) }
+.btStats { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px 14px; margin: 0 0 10px }
+.btStats div { display: flex; flex-direction: column; gap: 2px }
+.btStats dt { font-size: 11.5px; color: var(--text-faint) }
+.btStats dd { margin: 0; font-size: 15px; color: var(--text) }
+.btTokens { margin: 0 0 6px; font-size: 11.5px; line-height: 1.6; color: var(--text-muted) }
+.habits { margin: 0 0 14px; padding-left: 18px; font-size: 13.5px; line-height: 1.55; color: var(--text-2) }
+.habits li { margin-bottom: 6px }
+.memories { margin: 0 0 14px; padding: 0; list-style: none }
+.memories li { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 8px 0; border-top: 1px solid var(--border); font-size: 14px; color: var(--text-2) }
+.memories li:first-child { border-top: 0 }
+@media (max-width: 48rem) { .btStats { grid-template-columns: repeat(3, minmax(0, 1fr)) } }

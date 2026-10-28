@@ -15,6 +15,7 @@ export type TokenView = {
   position: { tokens: number; costEth: number; takeProfitPct: number | null; stopLossPct: number | null; trailingStopPct: number | null; hand: boolean } | null;
   held: number | null;
 };
+export type BacktestRun = import("@/lib/server/backtest").BacktestRun;
 export type Quote = { in: number; out: number; spot: number | null; feePct?: number };
 type Exits = { takeProfitPct?: string; stopLossPct?: string; trailingStopPct?: string };
 
@@ -43,6 +44,8 @@ export const api = {
   exits: (e: { token: string } & Exits) => call<{ ok: true }>("/api/exits", { method: "POST", json: e }),
   newChat: () => call<{ lines: Line[] }>("/api/chat/new", { method: "POST" }),
   decide: (id: string, approve: boolean) => call<{ status: string; result: { hash?: string; error?: string } | null }>(`/api/approvals/${id}`, { method: "POST", json: { approve } }),
+  backtest: (b: { preset?: string; spec?: Record<string, unknown> }) => call<BacktestRun>("/api/backtest", { method: "POST", json: b }),
+  forget: (id: string) => call<{ ok: true }>(`/api/memories/${id}`, { method: "DELETE" }),
   autopilot: (on: boolean, budgetEth: number) => call<{ ok: true }>("/api/autopilot", { method: "POST", json: { on, budgetEth } }),
   createStrategy: (s: { name: string; spec: Record<string, unknown>; mode: "ask" | "auto" }) => call<{ id: string }>("/api/strategies", { method: "POST", json: s }),
   strategy: (id: string, patch: { active?: boolean; mode?: "ask" | "auto" }) => call(`/api/strategies/${id}`, { method: "PATCH", json: patch }),

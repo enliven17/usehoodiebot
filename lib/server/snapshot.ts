@@ -4,6 +4,7 @@ import { formatEther } from "viem";
 
 import { api, query } from "../db";
 import { parseSpec, ruleRows, WATCH_LABEL } from "../strategy";
+import { journal } from "../journal";
 import { MEMBERS, type Member } from "../team";
 import { getExecutor, type Team } from "./team";
 import { autoDeployed } from "./tick";
@@ -22,6 +23,7 @@ export async function snapshot(team: Team) {
     query(api.events.recent, { owner, limit: 100 }),
     query(api.book.closed, { owner }),
   ]);
+  const memories = await query(api.memories.list, { owner });
   const [balance, prices, deployedEth] = await Promise.all([ex.spendable(team.wallet).catch(() => null), ex.prices(open.map((p) => p.token)).catch(() => new Map<string, number>()), autoDeployed(owner).catch(() => 0)]);
   // what each specialist did last, and how much of it in the last day
   const day = events.filter((e) => e.at > Date.now() - DAY_MS);
@@ -47,6 +49,8 @@ export async function snapshot(team: Team) {
     pnl: { realizedEth, unrealizedEth, closedCount: closed.length },
     events: events.slice(0, 40),
     agents,
+    memories,
+    journal: journal(closed.map((p) => ({ symbol: p.symbol, costEth: Number(formatEther(BigInt(p.costWei))), proceedsEth: Number(formatEther(BigInt(p.proceedsWei))), openedAt: p.openedAt, closedAt: p.closedAt, byStrategy: p.byStrategy }))),
     autopilot: { ...team.autopilot, deployedEth },
     strategies: strategies.map((s) => ({ id: s.id, name: s.name, mode: s.mode, active: s.active, watching: WATCH_LABEL[parseSpec(s.spec).watch], rules: ruleRows(parseSpec(s.spec)) })),
     approvals: approvals.map((a) => ({ id: a.id, kind: a.kind, token: a.token, symbol: a.symbol, eth: a.kind === "buy" ? formatEther(BigInt(a.amount)) : null, reason: a.reason, status: a.status, result: a.result as { hash?: string; error?: string } | null, createdAt: a.createdAt })),

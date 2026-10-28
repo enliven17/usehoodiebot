@@ -20,12 +20,15 @@ Your specialists are your tools:
 - TraderBot: offer_trade (the owner asked for this trade), propose_trade (your own idea, for approval)
 - LaunchBot: prepare_launch
 - ShieldBot: check_safety
-ResearchBot also has find_token to look a token up by name or symbol.
+ResearchBot also has find_token to look a token up by name or symbol, and technical_read for the chart. SniperBot has backtest_strategy. TraderBot has review_trades, the owner's journal. You keep notes across chats with remember and forget.
 You also have get_wallet for the team wallet.
 
 How you work:
 - Answer in a few short sentences, plain words, no headings, no markdown tables. Numbers with units. Token addresses shortened like 0x7ed5…ec7e.
 - Only call the tools listed. Use the exact token address a tool gave you; never invent one.
+- Read the chart with technical_read when timing matters: say if the entry is early, late or mid-move.
+- Before saving or recommending a strategy, offer to backtest it; when you do, give win rate, average return and worst trade, and say it tests exits on tokens still listed.
+- When the owner states a lasting preference or limit, remember it in one sentence, and respect every note below.
 - Before proposing any buy: research_token, then check_safety. Never propose a buy ShieldBot blocks; say why it was blocked. With a score under 70, say what worried ShieldBot and suggest a smaller size.
 - Think like a careful trader: momentum (buys versus sells, volume against market cap), how far along the curve it is, how old it is, who is buying, and what could go wrong. Give a clear call in one line (worth a small entry, wait, or skip) and the two or three facts behind it.
 - When the owner asks what is good right now, scan, pick the two or three best candidates on the numbers, check their safety, and rank them; do not list everything.
@@ -75,6 +78,8 @@ export async function chat(team: Team, text: string): Promise<void> {
     t = await mutate(api.teams.newThread, { owner: team.owner });
     rows = [];
   }
+  const notes = await query(api.memories.list, { owner: team.owner }).catch(() => []);
+  const system = notes.length ? `${SYSTEM}\n\nNotes the owner asked you to keep (id: note):\n${notes.map((n) => `- ${n.id}: ${n.text}`).join("\n")}` : SYSTEM;
   const context = contextOf(rows);
   const append = async (m: Exclude<ChatMessage, { role: "system" }>) => {
     context.push(m);
@@ -83,7 +88,7 @@ export async function chat(team: Team, text: string): Promise<void> {
   await append({ role: "user", content: text.slice(0, 4000) });
 
   for (let step = 0; step < MAX_STEPS; step++) {
-    const { message } = await complete({ messages: [{ role: "system", content: SYSTEM }, ...context], tools: apiTools() });
+    const { message } = await complete({ messages: [{ role: "system", content: system }, ...context], tools: apiTools() });
     await append(message);
     if (!message.tool_calls?.length) return;
     const results = await Promise.all(message.tool_calls.map(async (c) => ({ id: c.id, ...(await runTool(team, c.function.name, parseArgs(c.function.arguments))) })));

@@ -3,9 +3,12 @@ import "server-only";
 import { formatEther, parseEther } from "viem";
 
 import { addressUrl } from "../chain/robinhood";
-import { candidates, searchTokens, tokenMarket, type Candidate } from "../chain/market";
+import { candidates, candles, searchTokens, tokenMarket, type Candidate } from "../chain/market";
 import { CARD_TOOL, type TradeCard } from "../lines";
+import { journal } from "../journal";
 import { PRESETS, presetById } from "../presets";
+import { readBars } from "../ta";
+import { backtest } from "./backtest";
 import { afterFee } from "./fees";
 import { shield } from "../chain/shield";
 import { FACTORY_ABI, PONS_FACTORY } from "../chain/pons";
@@ -114,6 +117,58 @@ export const TOOLS: Tool[] = [
         at: Date.now(),
       };
       return { card, shown: "The owner sees a card with a confirm button; tell them to check it and press it. Do not say it traded." };
+    },
+  },
+  {
+    name: "technical_read", member: "research",
+    description: "Read a token's chart: trend (EMA 9 against 21), RSI, last-candle volume against its average, distance from the high and from the volume-weighted average price, as plain signals. Use it before calling an entry good or late.",
+    input_schema: obj({ token: { type: "string" }, timeframe: { type: "string", enum: ["1m", "5m", "15m", "1h"], description: "default 5m" } }, ["token"]),
+    async run(_t, i) {
+      const token = normalizeToken(i.token);
+      if (!token) return { error: "Not a token address." };
+      const m = await tokenMarket(token);
+      if (!m) return { error: "No chart for it yet." };
+      const tf = (["1m", "5m", "15m", "1h"] as const).find((x) => x === i.timeframe) ?? "5m";
+      const read = readBars(await candles(m.pool, tf));
+      return read ? { token, symbol: m.symbol, timeframe: tf, ...read } : { error: "Too few candles to read yet." };
+    },
+  },
+  {
+    name: "backtest_strategy", member: "sniper",
+    description: "Replay a strategy's exits (take profit, stop loss, trailing stop) on recent Pons tokens of the kind it watches, fees included: win rate, average and median return, best and worst, profit factor, P&L and drawdown at its size. Give a preset id or a spec. Say plainly it tests exits on tokens still listed, not the entry filters.",
+    input_schema: obj({ preset: { type: "string", enum: PRESETS.map((p) => p.id) }, spec: { ...SPEC_SCHEMA, required: [] } }),
+    async run(_t, i) {
+      const spec = parseSpec({ ...(presetById(i.preset)?.spec ?? { watch: "new", sizeEth: 0.01 }), ...((i.spec as object) ?? {}) });
+      const r = await backtest(spec);
+      return { rules: describe(spec), ...r, tokens: r.tokens.map((x) => ({ symbol: x.symbol, returnPct: Number(x.returnPct.toFixed(1)), exit: x.reason, heldCandles: x.heldBars })) };
+    },
+  },
+  {
+    name: "review_trades", member: "trader",
+    description: "The owner's trade journal from their closed positions: win rate, P&L, average win and loss, profit factor, how long winners and losers were held, hand trades against strategies, and the habits behind the numbers. Use it when they ask how they are doing or why they lose.",
+    input_schema: obj({}),
+    async run(team) {
+      const closed = await query(api.book.closed, { owner: team.owner });
+      return journal(closed.map((p) => ({ symbol: p.symbol, costEth: Number(formatEther(BigInt(p.costWei))), proceedsEth: Number(formatEther(BigInt(p.proceedsWei))), openedAt: p.openedAt, closedAt: p.closedAt, byStrategy: p.byStrategy }))) ?? { closed: 0, note: "No closed trades yet." };
+    },
+  },
+  {
+    name: "remember", member: "hoodiebot",
+    description: "Keep a note across every future chat when the owner states a preference or a rule (\"never more than 0.05 ETH a trade\", \"I like launches under 10 minutes\"). One short sentence, in the owner's terms.",
+    input_schema: obj({ note: { type: "string" } }, ["note"]),
+    async run(team, i) {
+      const note = String(i.note ?? "").trim().slice(0, 280);
+      if (!note) return { error: "Nothing to remember." };
+      const id = await mutate(api.memories.add, { owner: team.owner, text: note });
+      return id ? { id, remembered: note } : { error: "Memory is full (40 notes). Ask the owner which to forget." };
+    },
+  },
+  {
+    name: "forget", member: "hoodiebot",
+    description: "Drop a note the owner no longer wants kept. Use the id from the notes in your instructions.",
+    input_schema: obj({ id: { type: "string" } }, ["id"]),
+    async run(team, i) {
+      return (await mutate(api.memories.remove, { owner: team.owner, id: String(i.id ?? "") })) ? { ok: true } : { error: "No such note." };
     },
   },
   {
@@ -240,6 +295,12 @@ function timeline(name: string, args: Record<string, unknown>, out: unknown): Te
       const what = m ? `${m.symbol}: ${m.curvePct ?? "?"}% up its curve, $${(m.liquidityUsd ?? 0).toLocaleString("en-US")} liquidity` : "a token that is not listed yet";
       return { member: "research", kind: "research", text: `Read ${what}, on ${String(o.tradesOn ?? "Pons")}.`, token: String(o.token ?? token ?? ""), symbol: m?.symbol };
     }
+    case "backtest_strategy": {
+      const sm = o.summary as { trades: number; winRatePct: number; avgReturnPct: number } | null;
+      return sm ? { member: "sniper", kind: "backtest", text: `Backtested a strategy on ${sm.trades} tokens: ${sm.winRatePct.toFixed(0)}% won, ${sm.avgReturnPct >= 0 ? "+" : ""}${sm.avgReturnPct.toFixed(1)}% on average after fees.` } : null;
+    }
+    case "remember":
+      return { member: "hoodiebot", kind: "memory", text: `Will remember: ${String(o.remembered ?? "")}` };
     case "check_safety":
       return { member: "shield", kind: "safety", text: o.blocked ? `Blocked a token: ${String((o.blocks as string[])[0] ?? "")}` : `Safety ${String(o.score)}/100${(o.warnings as string[]).length ? `: ${(o.warnings as string[]).join(" ")}` : ", nothing flagged."}`, token: String(o.token ?? token ?? "") };
     case "propose_trade":
