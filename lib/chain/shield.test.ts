@@ -32,3 +32,9 @@ test("warnings cost score: creator selling, one whale, no socials", () => {
   assert.equal(s.warns.length, 3);
   assert.equal(s.score, 55);
 });
+
+test("a token with only a handful of buys is never a clean 100", () => {
+  const s = assess(info, healthy.slice(0, 5));
+  assert.match(s.warns.join(" "), /too early/);
+  assert.ok(s.score < 100);
+});

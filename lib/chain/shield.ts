@@ -40,7 +40,7 @@ export type Shield = {
 };
 
 /** The bars, in one place: the creator holding this much blocks, and so on. */
-export const SHIELD = { maxDevPct: 15, sameSizeWallets: 4, warnTop10Pct: 85, warnBiggestBuyerPct: 40, fewBuyers: 5, fewHolders: 40 } as const;
+export const SHIELD = { maxDevPct: 15, sameSizeWallets: 4, warnTop10Pct: 85, warnBiggestBuyerPct: 40, fewBuyers: 5, fewHolders: 40, fewBuys: 10 } as const;
 
 const n = (v: unknown) => {
   const x = typeof v === "string" ? Number(v) : typeof v === "number" ? v : NaN;
@@ -81,7 +81,9 @@ export function assess(info: TokenInfo, trades: Trade[]): Shield {
   if (devSells > 0) warns.push(`The creator sold ${devSells} time${devSells > 1 ? "s" : ""} in the recent trades.`);
   if (top10Pct !== null && top10Pct >= SHIELD.warnTop10Pct) warns.push(`The top 10 holders have ${pct(top10Pct)}, curve and pool included.`);
   if (biggestBuyerPct !== null && biggestBuyerPct >= SHIELD.warnBiggestBuyerPct) warns.push(`One wallet made ${pct(biggestBuyerPct)} of the recent buying.`);
-  if (byWallet.size < SHIELD.fewBuyers) warns.push(`Only ${byWallet.size} wallet${byWallet.size === 1 ? "" : "s"} bought recently.`);
+  // too little trading to read anything: nothing flagged is not the same as safe
+  if (buys.length < SHIELD.fewBuys) warns.push(`Only ${buys.length} buy${buys.length === 1 ? "" : "s"} so far: too early to read who is buying.`);
+  else if (byWallet.size < SHIELD.fewBuyers) warns.push(`Only ${byWallet.size} wallet${byWallet.size === 1 ? "" : "s"} bought recently.`);
   if (holders !== null && holders < SHIELD.fewHolders) warns.push(`Only ${holders} holders.`);
   if (!socials) warns.push("No X, Telegram or website listed.");
 
