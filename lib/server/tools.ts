@@ -243,9 +243,13 @@ export const TOOLS: Tool[] = [
   },
   {
     name: "update_strategy", member: "sniper",
-    description: "Pause or resume a strategy. Automatic trading is only for the owner to switch on, in the Team tab under Autopilot.",
+    description: "Pause a strategy, or resume one that asks before each trade. A strategy that trades automatically can only be resumed by the owner in the Team tab.",
     input_schema: obj({ id: { type: "string" }, active: { type: "boolean" } }, ["id", "active"]),
     async run(team, i) {
+      if (i.active === true) {
+        const st = (await query(api.strategies.byOwner, { owner: team.owner })).find((x) => x.id === String(i.id));
+        if (st?.mode === "auto") return { error: "This strategy trades automatically; only the owner can resume it, in the Team tab." };
+      }
       const ok = await mutate(api.strategies.update, { owner: team.owner, id: String(i.id), ...(typeof i.active === "boolean" ? { active: i.active } : {}) });
       return ok ? { ok: true } : { error: "No such strategy." };
     },

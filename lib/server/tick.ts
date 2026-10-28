@@ -83,9 +83,12 @@ async function enter(s: Strategy, spec: Spec, market: Candidate[]) {
 
 /** ETH the owner's automatic strategies have in open positions right now, at cost: what counts against the budget. */
 export async function autoDeployed(owner: string): Promise<number> {
-  const [open, strategies] = await Promise.all([query(api.book.open, { owner }), query(api.strategies.byOwner, { owner })]);
+  const [open, strategies, sent] = await Promise.all([query(api.book.open, { owner }), query(api.strategies.byOwner, { owner }), query(api.approvals.sent, {})]);
   const auto = new Set(strategies.filter((x) => x.mode === "auto").map((x) => x.id));
-  return open.filter((p) => p.strategyId && auto.has(p.strategyId)).reduce((t, p) => t + Number(formatEther(BigInt(p.costWei))), 0);
+  const held = open.filter((p) => p.strategyId && auto.has(p.strategyId)).reduce((t, p) => t + Number(formatEther(BigInt(p.costWei))), 0);
+  // buys broadcast but not settled yet: the ETH has left even though the position is not booked
+  const pending = sent.filter((a) => a.owner === owner && a.kind === "buy" && a.strategyId && auto.has(a.strategyId)).reduce((t, a) => t + Number(formatEther(BigInt(a.amount))), 0);
+  return held + pending;
 }
 
 /** Records a new high for each position whose price beat it; returns the high to measure a trailing stop from. */

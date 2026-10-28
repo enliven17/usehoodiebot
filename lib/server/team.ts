@@ -70,6 +70,10 @@ export async function trade(team: Team, a: { kind: "buy" | "sell"; token: string
   const base = { walletId: team.walletId, wallet: team.wallet, token: a.token, slippageBps: a.slippageBps, onSigned: async (h: string) => void (hash = h) };
   const sent = (err: unknown) => Promise.reject(isAmbiguousSend(err) && hash ? new SentTrade(hash) : err);
   if (a.kind === "buy") {
+    // the daily ceiling on real ETH a team buys with: hand, card, approval or automatic, whichever path
+    const cap = Number(process.env.MAX_DAILY_BUY_ETH ?? 5);
+    const day = await mutate(api.limits.spend, { key: `buy-eth:${team.owner.toLowerCase()}`, amount: Number(formatEther(a.amount)), cap, windowMs: 24 * 3600_000 }).catch(() => ({ ok: true, used: 0 }));
+    if (!day.ok) throw new Error(`That would pass the ${cap} ETH a day this team may buy with (${day.used.toFixed(4)} ETH used). It resets 24 hours after the first buy.`);
     const spendable = await ex.spendable(team.wallet);
     if (spendable < a.amount) throw new Error(`The wallet has ${formatEther(spendable)} ETH to trade; this needs ${formatEther(a.amount)}.`);
     // the commission comes off the top: the swap gets the rest, the position's cost is the whole amount

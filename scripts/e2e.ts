@@ -30,8 +30,9 @@ const step = async <T>(name: string, fn: () => Promise<T>) => {
 };
 
 const account = privateKeyToAccount(generatePrivateKey());
-const { nonce } = (await step("nonce", () => call("/api/auth/nonce"))) as { nonce: string };
-const signature = await account.signMessage({ message: signInMessage(account.address, nonce) });
+const { nonce, issuedAt } = (await step("nonce", () => call("/api/auth/nonce"))) as { nonce: string; issuedAt: string };
+const site = new URL(base);
+const signature = await account.signMessage({ message: signInMessage({ domain: site.host, uri: site.origin, address: account.address, nonce, issuedAt }) });
 await step("verify", () => call("/api/auth/verify", { method: "POST", json: { address: account.address, signature } }));
 
 // the waitlist: a new owner applies; unless the app runs with OPEN_ACCESS=1 (local), no team wallet until an admin approves
@@ -131,6 +132,20 @@ await step("switch to live", () => call("/api/mode", { method: "POST", json: { m
 const refused = await call("/api/trade", { method: "POST", json: { side: "buy", token: pick.token, symbol: pick.symbol, eth: "0.001", slippageBps: 500 } }).catch((e: Error) => e.message);
 if (typeof refused !== "string" || !/ETH to trade/.test(refused)) throw new Error(`live hand buy was not refused: ${JSON.stringify(refused)}`);
 console.log("ok  live hand buy refused:", refused.slice(0, 90));
+
+// a write from another site is refused before any route runs
+const foreign = await fetch(base + "/api/mode", { method: "POST", headers: { origin: "https://evil.example", "content-type": "application/json", cookie: [...jar].map(([k, v]) => `${k}=${v}`).join("; ") }, body: JSON.stringify({ mode: "paper" }) });
+if (foreign.status !== 403) throw new Error(`a cross-site write got ${foreign.status}`);
+console.log("ok  cross-site write refused");
+
+// signing out ends every session: a copy of the old cookie no longer works
+const copy = new Map(jar);
+await step("sign out", () => call("/api/auth/logout", { method: "POST" }));
+jar.clear();
+for (const [k, v] of copy) jar.set(k, v);
+const stale = await call("/api/team").catch((e: Error) => e.message);
+if (typeof stale !== "string" || !/401/.test(stale)) throw new Error(`an old cookie still works after sign-out: ${JSON.stringify(stale).slice(0, 120)}`);
+console.log("ok  old session refused after sign-out");
 
 // --strategy: save a loose strategy through chat, wait for the minute tick to match a token, then approve it. The
 // throwaway wallet holds no ETH, so the approval must fail safely with the balance message (no transaction is sent).

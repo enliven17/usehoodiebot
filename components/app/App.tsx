@@ -112,13 +112,15 @@ export function App({ signedIn }: { signedIn: boolean }) {
     }
   }, [thinking, refresh]);
 
-  // a prompt handed over from the landing page composer
+  // a prompt handed over from the landing page composer, waiting in the box for the owner to send
   useEffect(() => {
     const q = params.get("q");
     if (authed && snap && q && !seeded.current) {
       seeded.current = true;
       window.history.replaceState(null, "", "/app");
-      void send(q);
+      // a prompt from a link is only put in the box: the owner reads it and sends it, so a crafted link cannot speak for them
+      setText(q.slice(0, 4000));
+      document.getElementById("prompt")?.focus();
     }
   }, [authed, snap, params, send]);
 

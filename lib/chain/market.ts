@@ -55,6 +55,12 @@ const num = (v: unknown) => {
   return Number.isFinite(n) ? n : undefined;
 };
 
+/**
+ * A token's symbol as anyone may write it, cut to letters, digits and a few marks, 24 characters at most: it reaches the
+ * model and the screen, and a launcher can put instructions in it.
+ */
+export const cleanSymbol = (s: string) => s.replace(/[^\p{L}\p{N} $._-]/gu, "").replace(/\s+/g, " ").trim().slice(0, 24);
+
 export function toCandidate(p: Pool, venue: Venue, now: number): Candidate | null {
   const a = p.attributes ?? {};
   const raw = p.relationships?.base_token?.data?.id?.replace(/^robinhood_/, "");
@@ -66,7 +72,7 @@ export function toCandidate(p: Pool, venue: Venue, now: number): Candidate | nul
     token: getAddress(raw),
     pool: a.address,
     quote: (a.name ?? "").split(" / ")[1]?.trim().split(" ")[0],
-    symbol: (a.name ?? "").split(" / ")[0]?.trim() || raw.slice(0, 6),
+    symbol: cleanSymbol((a.name ?? "").split(" / ")[0] ?? "") || raw.slice(0, 6),
     venue,
     priceEth: num(a.base_token_price_native_currency) ?? null,
     liquidityUsd,
@@ -119,6 +125,8 @@ export function gt<T>(url: string, ttl = TTL_MS): Promise<T> {
       throw err;
     });
   cache.set(url, { at: Date.now(), data, good: hit?.good });
+  // at most 500 answers kept: the oldest go first (a Map keeps insertion order)
+  while (cache.size > 500) cache.delete(cache.keys().next().value!);
   return data;
 }
 const pools = (url: string) => gt<{ data?: Pool[] }>(url).then((j) => j.data ?? []);
