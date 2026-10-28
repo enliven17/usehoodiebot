@@ -265,7 +265,7 @@ export function App({ signedIn }: { signedIn: boolean }) {
             }}
           />
           <div className={s.toolbar}>
-            <span className={s.who}><Hoodie size={26} mood={mood} />{error ? <span className="down">{error}</span> : "Robinhood Chain · mainnet"}</span>
+            <span className={s.who}><Hoodie size={26} mood={mood} />{error ? <span className="down">{error}</span> : snap?.mode === "paper" ? "Paper trading · live prices" : "Robinhood Chain · mainnet"}</span>
             <button type="submit" className={s.send} data-ready={text.trim() && !thinking ? "" : undefined} disabled={thinking} aria-label="Send">
               <svg className="i" viewBox="0 0 24 24"><path d="M7 7h10v10" /><path d="M7 17 17 7" /></svg>
             </button>

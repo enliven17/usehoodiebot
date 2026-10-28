@@ -51,7 +51,7 @@ export function Timeline({ snap }: { snap: Snapshot }) {
                     {e.wei || e.hash || e.token ? (
                       <p className={s.eventMeta}>
                         {e.wei ? <span className={`num ${BigInt(e.wei) >= 0n ? "up" : "down"}`}>{ethOf(e.wei)}</span> : null}
-                        {e.hash ? <a className="num" href={txUrl(e.hash)} target="_blank" rel="noopener">tx</a> : null}
+                        {e.hash && txUrl(e.hash) ? <a className="num" href={txUrl(e.hash)} target="_blank" rel="noopener">tx</a> : null}
                         {e.token ? <a className="num" href={addressUrl(e.token)} target="_blank" rel="noopener">{e.symbol ?? "token"}</a> : null}
                       </p>
                     ) : null}

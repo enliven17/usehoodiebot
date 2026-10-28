@@ -57,13 +57,13 @@ export function TradeCard({ card, onDone }: { card: Card; onDone: () => void }) 
         </p>
       ) : null}
       {hash ? (
-        <p className={s.tcDone}><span className="up">{buy ? "Bought" : "Sold"}.</span> <a href={txUrl(hash)} target="_blank" rel="noopener">View transaction</a></p>
+        <p className={s.tcDone}><span className="up">{buy ? "Bought" : "Sold"}{card.paper ? " on paper" : ""}.</span> {txUrl(hash) ? <a href={txUrl(hash)} target="_blank" rel="noopener">View transaction</a> : null}</p>
       ) : (
         <div className={s.tcActions}>
           <StatusButton className={`btn ${s.go}`} data-side={card.side} disabled={blocked || stale} onClick={go} successLabel={buy ? "Bought" : "Sold"}>
-            {blocked ? "Blocked by ShieldBot" : stale ? "Ask again, the price has moved" : `${buy ? "Buy" : "Sell"} ${card.symbol}`}
+            {blocked ? "Blocked by ShieldBot" : stale ? "Ask again, the price has moved" : `${buy ? "Buy" : "Sell"} ${card.symbol}${card.paper ? " on paper" : ""}`}
           </StatusButton>
-          <span className="faint">Includes Hoodie's 0.5% fee, up to 3% slippage.</span>
+          <span className="faint">{card.paper ? "Practice ETH at the live price: nothing is spent." : "Includes Hoodie's 0.5% fee, up to 3% slippage."}</span>
         </div>
       )}
       {error ? <p className={s.error} role="alert">{error}</p> : null}

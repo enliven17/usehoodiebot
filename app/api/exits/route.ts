@@ -12,6 +12,6 @@ export async function POST(req: Request) {
   if (!token) return fail(400, "Bad request.");
   const exits = exitsOf(b!);
   if (typeof exits === "string") return fail(400, exits);
-  const n = await mutate(api.book.setExits, { owner: team.owner, token, ...exits });
+  const n = await mutate(api.book.setExits, { owner: team.owner, token, paper: team.mode === "paper", ...exits });
   return n ? Response.json({ ok: true }) : fail(404, "No position you bought by hand in this token.");
 }

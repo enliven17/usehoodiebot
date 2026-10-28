@@ -434,3 +434,8 @@
 .memories li { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 8px 0; border-top: 1px solid var(--border); font-size: 14px; color: var(--text-2) }
 .memories li:first-child { border-top: 0 }
 @media (max-width: 48rem) { .btStats { grid-template-columns: repeat(3, minmax(0, 1fr)) } }
+
+/* paper or live */
+.modeBox { margin: -2px 0 14px }
+.modeAsk { overflow: hidden }
+.modeAsk p { margin: 10px 0; font-size: 13px; line-height: 1.5; color: var(--text-2) }

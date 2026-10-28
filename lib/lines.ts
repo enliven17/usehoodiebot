@@ -19,6 +19,8 @@ export type TradeCard = {
   held: number | null;
   safety: { score: number; blocked: boolean; note: string } | null;
   at: number;
+  /** filled on paper, at live prices, with no real ETH */
+  paper?: boolean;
   /** the transaction, once the owner confirmed it */
   done?: string;
 };

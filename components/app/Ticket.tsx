@@ -117,7 +117,7 @@ export function Ticket({ pick, snap, view, last, side: asked, onDone }: { pick: 
           <div className={s.ticketRow}>
             <label htmlFor="buy-eth">You pay</label>
             <button type="button" className={s.balanceBtn} onClick={() => free && setAmount(floor6(free))} disabled={!free}>
-              Available <span className="num">{free === null ? "–" : ethText(free)}</span>
+              {snap.mode === "paper" ? "Paper" : "Available"} <span className="num">{free === null ? "–" : ethText(free)}</span>
             </button>
           </div>
           <div className={s.amountBox}>
@@ -183,7 +183,7 @@ export function Ticket({ pick, snap, view, last, side: asked, onDone }: { pick: 
       </fieldset>
 
       <StatusButton className={`btn ${s.go}`} data-side={side} onClick={go} successLabel={side === "buy" ? "Bought" : "Sold"}>
-        {side === "buy" ? `Buy ${symbol}` : `Sell ${pct === 100 ? "all" : `${pct}%`} ${symbol}`}
+        {side === "buy" ? `Buy ${symbol}` : `Sell ${pct === 100 ? "all" : `${pct}%`} ${symbol}`}{snap.mode === "paper" ? " on paper" : ""}
       </StatusButton>
 
       <AnimatePresence mode="wait">

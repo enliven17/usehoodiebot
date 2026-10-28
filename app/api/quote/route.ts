@@ -2,7 +2,7 @@ import { parseEther } from "viem";
 
 import { afterFee, FEE_BPS } from "@/lib/server/fees";
 import { errorText, fail, requireTeam } from "@/lib/server/http";
-import { getExecutor, normalizeToken } from "@/lib/server/team";
+import { getExecutor, heldOf, normalizeToken } from "@/lib/server/team";
 
 /**
  * What a trade would fill at right now, fees included, read from the curve or the pool: tokens out for a buy of `eth`,
@@ -22,7 +22,7 @@ export async function GET(req: Request) {
     else {
       const pct = Number(q.get("pct"));
       if (!(pct > 0 && pct <= 100)) return fail(400, "Bad request.");
-      amount = ((await ex.tokenBalance(team.wallet, token)) * BigInt(Math.round(pct * 100))) / 10_000n;
+      amount = ((await heldOf(team, token)) * BigInt(Math.round(pct * 100))) / 10_000n;
     }
     const feePct = Number(FEE_BPS) / 100;
     if (amount <= 0n) return Response.json({ in: 0, out: 0, spot: null, feePct });

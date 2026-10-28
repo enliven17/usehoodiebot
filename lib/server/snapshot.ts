@@ -15,16 +15,18 @@ const DAY_MS = 24 * 3600_000;
 export async function snapshot(team: Team) {
   const ex = getExecutor();
   const owner = team.owner;
+  const paper = team.mode === "paper";
   const [open, strategies, approvals, trades, events, closed] = await Promise.all([
-    query(api.book.open, { owner }),
+    query(api.book.open, { owner, paper }),
     query(api.strategies.byOwner, { owner }),
     query(api.approvals.recent, { owner }),
-    query(api.book.trades, { owner }),
+    query(api.book.trades, { owner, paper }),
     query(api.events.recent, { owner, limit: 100 }),
-    query(api.book.closed, { owner }),
+    query(api.book.closed, { owner, paper }),
   ]);
   const memories = await query(api.memories.list, { owner });
-  const [balance, prices, deployedEth] = await Promise.all([ex.spendable(team.wallet).catch(() => null), ex.prices(open.map((p) => p.token)).catch(() => new Map<string, number>()), autoDeployed(owner).catch(() => 0)]);
+  // on paper the balance is the paper one; the wallet's own ETH is shown beside it
+  const [balance, prices, deployedEth] = await Promise.all([paper ? Promise.resolve(team.paperWei) : ex.spendable(team.wallet).catch(() => null), ex.prices(open.map((p) => p.token)).catch(() => new Map<string, number>()), autoDeployed(owner).catch(() => 0)]);
   // what each specialist did last, and how much of it in the last day
   const day = events.filter((e) => e.at > Date.now() - DAY_MS);
   const agents = Object.fromEntries(
@@ -45,6 +47,7 @@ export async function snapshot(team: Team) {
     owner,
     wallet: team.wallet,
     spendableEth: balance === null ? null : formatEther(balance),
+    mode: team.mode,
     positions,
     pnl: { realizedEth, unrealizedEth, closedCount: closed.length },
     events: events.slice(0, 40),

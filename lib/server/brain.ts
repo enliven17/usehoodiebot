@@ -79,7 +79,8 @@ export async function chat(team: Team, text: string): Promise<void> {
     rows = [];
   }
   const notes = await query(api.memories.list, { owner: team.owner }).catch(() => []);
-  const system = notes.length ? `${SYSTEM}\n\nNotes the owner asked you to keep (id: note):\n${notes.map((n) => `- ${n.id}: ${n.text}`).join("\n")}` : SYSTEM;
+  const mode = team.mode === "paper" ? "\n\nThe team is in PAPER mode: every trade fills at live prices against a 1 ETH practice balance and no real ETH moves. Say \"on paper\" when you talk about trades and balances. The owner switches to live trading in the wallet panel." : "";
+  const system = notes.length ? `${SYSTEM}${mode}\n\nNotes the owner asked you to keep (id: note):\n${notes.map((n) => `- ${n.id}: ${n.text}`).join("\n")}` : `${SYSTEM}${mode}`;
   const context = contextOf(rows);
   const append = async (m: Exclude<ChatMessage, { role: "system" }>) => {
     context.push(m);

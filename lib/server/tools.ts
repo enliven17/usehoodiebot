@@ -19,7 +19,7 @@ import type { Member } from "../team";
 import { safeMessage } from "./errors";
 import { logEvent, type TeamEvent } from "./events";
 import type { ToolDef } from "./llm";
-import { getExecutor, normalizeToken, propose, type Team } from "./team";
+import { getExecutor, heldOf, normalizeToken, propose, type Team } from "./team";
 
 type Tool = { name: string; description: string; input_schema: Record<string, unknown>; member: Member; run: (team: Team, input: Record<string, unknown>) => Promise<unknown> };
 
@@ -103,10 +103,10 @@ export const TOOLS: Tool[] = [
       const pct = side === "sell" ? Math.min(100, Math.max(1, Number(i.pct) || 100)) : null;
       const [market, held, safety] = await Promise.all([
         tokenMarket(token).catch(() => null),
-        ex.tokenBalance(team.wallet, token).catch(() => 0n),
+        heldOf(team, token).catch(() => 0n),
         side === "buy" ? safetyOf(token).catch(() => null) : Promise.resolve(null),
       ]);
-      if (side === "sell" && held === 0n) return { error: "The team wallet holds none of it." };
+      if (side === "sell" && held === 0n) return { error: team.mode === "paper" ? "The paper book holds none of it." : "The team wallet holds none of it." };
       const amount = side === "buy" ? afterFee(parseEther(String(eth))) : (held * BigInt(Math.round(pct! * 100))) / 10_000n;
       const out = await ex.quote(token, side, amount).then((o) => Number(side === "buy" ? o : afterFee(o)) / 1e18).catch(() => null);
       const card: Omit<TradeCard, "id"> = {
@@ -115,6 +115,7 @@ export const TOOLS: Tool[] = [
         held: Number(held) / 1e18,
         safety: safety ? { score: safety.score, blocked: safety.blocks.length > 0, note: safety.blocks[0] ?? safety.warns[0] ?? "Nothing flagged." } : side === "buy" ? { score: -1, blocked: false, note: "ShieldBot could not check it just now; you are buying it unchecked." } : null,
         at: Date.now(),
+        paper: team.mode === "paper",
       };
       return { card, shown: "The owner sees a card with a confirm button; tell them to check it and press it. Do not say it traded." };
     },
@@ -148,7 +149,7 @@ export const TOOLS: Tool[] = [
     description: "The owner's trade journal from their closed positions: win rate, P&L, average win and loss, profit factor, how long winners and losers were held, hand trades against strategies, and the habits behind the numbers. Use it when they ask how they are doing or why they lose.",
     input_schema: obj({}),
     async run(team) {
-      const closed = await query(api.book.closed, { owner: team.owner });
+      const closed = await query(api.book.closed, { owner: team.owner, paper: team.mode === "paper" });
       return journal(closed.map((p) => ({ symbol: p.symbol, costEth: Number(formatEther(BigInt(p.costWei))), proceedsEth: Number(formatEther(BigInt(p.proceedsWei))), openedAt: p.openedAt, closedAt: p.closedAt, byStrategy: p.byStrategy }))) ?? { closed: 0, note: "No closed trades yet." };
     },
   },
@@ -188,10 +189,11 @@ export const TOOLS: Tool[] = [
     input_schema: obj({}),
     async run(team) {
       const ex = getExecutor();
-      const open = await query(api.book.open, { owner: team.owner });
-      const [spendable, prices] = await Promise.all([ex.spendable(team.wallet), ex.prices(open.map((p) => p.token))]);
+      const paper = team.mode === "paper";
+      const open = await query(api.book.open, { owner: team.owner, paper });
+      const [spendable, prices] = await Promise.all([paper ? Promise.resolve(team.paperWei) : ex.spendable(team.wallet), ex.prices(open.map((p) => p.token))]);
       return {
-        wallet: team.wallet, spendableEth: formatEther(spendable),
+        mode: paper ? "paper: simulated fills at live prices, no real ETH" : "live", wallet: team.wallet, spendableEth: formatEther(spendable),
         positions: open.map((p) => {
           const price = prices.get(p.token);
           const value = price === undefined ? null : (Number(p.tokens) / 1e18) * price;

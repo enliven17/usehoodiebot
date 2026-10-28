@@ -96,11 +96,13 @@ export function Wallet({ snap, onChange }: { snap: Snapshot; onChange: () => voi
     }
   }
 
+  const paper = snap.mode === "paper";
   return (
     <section className={s.block} aria-labelledby="wallet-h">
-      <h2 id="wallet-h" className={s.blockTitle}>Team wallet</h2>
+      <h2 id="wallet-h" className={s.blockTitle}>{paper ? "Paper trading" : "Team wallet"}</h2>
+      <Mode snap={snap} onChange={onChange} />
       <div className={s.balances}>
-        <div><span className="faint">To trade</span><strong className="num">{eth(snap.spendableEth)}</strong></div>
+        <div><span className="faint">{paper ? "Paper balance" : "To trade"}</span><strong className="num">{eth(snap.spendableEth)}</strong></div>
         <div><span className="faint">In positions</span><strong className="num">{eth(value)}</strong></div>
       </div>
       {snap.pnl.closedCount || snap.positions.length ? (
@@ -110,6 +112,13 @@ export function Wallet({ snap, onChange }: { snap: Snapshot; onChange: () => voi
           <span className={`num ${snap.pnl.unrealizedEth >= 0 ? "up" : "down"}`} title="Open positions at the live sell quote">{signed(snap.pnl.unrealizedEth)} open</span>
         </div>
       ) : null}
+      {paper ? (
+        <p className="faint" style={{ fontSize: 13, margin: "0 0 4px" }}>
+          Trades fill at live prices with practice ETH: nothing is sent and nothing is spent.{" "}
+          <button type="button" className={s.linkish} onClick={() => api.resetPaper().then(onChange)}>Reset to 1 ETH</button>
+        </p>
+      ) : null}
+      {paper ? null : (<>
       <div className={s.addressRow}>
         <a className="num" href={addressUrl(snap.wallet)} target="_blank" rel="noopener">{short(snap.wallet)}</a>
         <button
@@ -131,7 +140,33 @@ export function Wallet({ snap, onChange }: { snap: Snapshot; onChange: () => voi
         <button type="submit" className="btn">Withdraw</button>
       </form>
       {msg ? <p className={s.note} role="status">{msg}</p> : null}
+      </>)}
     </section>
+  );
+}
+
+/** Paper or live: the owner's switch, with a word of warning before real ETH is used. */
+function Mode({ snap, onChange }: { snap: Snapshot; onChange: () => void }) {
+  const [asking, setAsking] = useState(false);
+  const set = (mode: "paper" | "live") => api.mode(mode).then(() => (setAsking(false), onChange()));
+  return (
+    <div className={s.modeBox}>
+      <div className={s.seg} role="group" aria-label="Trading mode">
+        <button type="button" aria-pressed={snap.mode === "paper"} onClick={() => snap.mode !== "paper" && set("paper")}>Paper</button>
+        <button type="button" aria-pressed={snap.mode === "live"} onClick={() => snap.mode !== "live" && setAsking(true)}>Live</button>
+      </div>
+      <AnimatePresence>
+        {asking ? (
+          <motion.div className={s.modeAsk} initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} role="alertdialog" aria-label="Switch to live trading">
+            <p>Live trading uses the real ETH in the team wallet: every buy, card and strategy from here on spends it. Your paper book stays as it is.</p>
+            <div className={s.approvalActions}>
+              <button type="button" className="btn btn-primary" onClick={() => set("live")}>Switch to live</button>
+              <button type="button" className="btn" onClick={() => setAsking(false)}>Stay on paper</button>
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+    </div>
   );
 }
 

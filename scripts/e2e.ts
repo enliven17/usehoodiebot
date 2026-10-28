@@ -90,11 +90,12 @@ const card = said.cards?.[0];
 if (card) {
   console.log("    card", card.side, card.symbol, card.ethAmount, "ETH · shield", card.safety?.score, card.safety?.blocked ? "blocked" : "");
   if (!card.safety?.blocked) {
-    for (let k = 0; k < 2; k++) {
-      const r = await call("/api/trade", { method: "POST", json: { side: card.side, token: card.token, symbol: card.symbol, eth: String(card.ethAmount), slippageBps: 300, cardId: card.id } }).catch((e: Error) => e.message);
-      if (typeof r !== "string" || !/ETH to trade/.test(r)) throw new Error(`card press ${k + 1}: ${JSON.stringify(r)}`);
-    }
-    console.log("ok  card refused twice for lack of ETH, never marked done");
+    // a new team is on paper: the card fills once at the live quote, a second press is refused
+    const first = (await step("card press on paper", () => call("/api/trade", { method: "POST", json: { side: card.side, token: card.token, symbol: card.symbol, eth: String(card.ethAmount), slippageBps: 300, cardId: card.id } }))) as { hash: string };
+    if (!first.hash.startsWith("paper:")) throw new Error(`card filled outside paper: ${first.hash}`);
+    const again = await call("/api/trade", { method: "POST", json: { side: card.side, token: card.token, symbol: card.symbol, eth: String(card.ethAmount), slippageBps: 300, cardId: card.id } }).catch((e: Error) => e.message);
+    if (typeof again !== "string" || !/already done/.test(again)) throw new Error(`card filled twice: ${JSON.stringify(again)}`);
+    console.log("ok  card filled once on paper, the second press refused");
   }
 } else console.log("    no card: the agent asked first (several matches or no amount)");
 
@@ -110,11 +111,26 @@ console.log("    pool", view.market?.pool, "held", view.held);
 const q = (await step("quote 0.001 ETH", () => call(`/api/quote?token=${pick.token}&side=buy&eth=0.001`))) as { in: number; out: number; spot: number | null };
 console.log("    quote", q);
 if (!(q.out > 0)) throw new Error("quote returned nothing");
+// paper trading by hand: buy at the live quote, the paper balance drops, the position shows, sell it all, it closes
+const before2 = (await call("/api/team")) as { mode: string; spendableEth: string };
+if (before2.mode !== "paper") throw new Error(`a new team should start on paper, not ${before2.mode}`);
+const pbuy = (await step("paper buy 0.001 ETH", () => call("/api/trade", { method: "POST", json: { side: "buy", token: pick.token, symbol: pick.symbol, eth: "0.001", slippageBps: 500, takeProfitPct: 80, stopLossPct: 35 } }))) as { hash: string };
+const mid = (await call("/api/team")) as { spendableEth: string; positions: Array<{ token: string }> };
+if (!pbuy.hash.startsWith("paper:") || !(Number(mid.spendableEth) < Number(before2.spendableEth)) || !mid.positions.some((p) => p.token === pick.token)) throw new Error("the paper buy did not book");
+const held = (await call(`/api/market/${pick.token}`)) as { held: number | null; position: { takeProfitPct: number | null } | null };
+if (!(held.held! > 0) || held.position?.takeProfitPct !== 80) throw new Error("the paper position or its exits are missing");
+await step("paper sell all", () => call("/api/trade", { method: "POST", json: { side: "sell", token: pick.token, symbol: pick.symbol, pct: 100, slippageBps: 500 } }));
+const end = (await call("/api/team")) as { spendableEth: string; positions: Array<{ token: string }>; journal: { closed: number } | null };
+if (end.positions.some((p) => p.token === pick.token) || (end.journal?.closed ?? 0) < 1) throw new Error("the paper sell did not close the position");
+console.log(`ok  paper round trip: ${before2.spendableEth} → ${Number(end.spendableEth).toFixed(6)} ETH, journal ${end.journal!.closed} closed`);
 const noPos = await call("/api/exits", { method: "POST", json: { token: pick.token, takeProfitPct: 80 } }).catch((e: Error) => e.message);
 if (typeof noPos !== "string" || !/No position/.test(noPos)) throw new Error(`exits without a position: ${JSON.stringify(noPos)}`);
-const refused = await call("/api/trade", { method: "POST", json: { side: "buy", token: pick.token, symbol: pick.symbol, eth: "0.001", slippageBps: 500, takeProfitPct: 80, stopLossPct: 35 } }).catch((e: Error) => e.message);
-if (typeof refused !== "string" || !/ETH to trade/.test(refused)) throw new Error(`hand buy was not refused: ${JSON.stringify(refused)}`);
-console.log("ok  hand buy refused:", refused.slice(0, 90));
+
+// live: the same buy is refused for lack of real ETH, and nothing is sent
+await step("switch to live", () => call("/api/mode", { method: "POST", json: { mode: "live" } }));
+const refused = await call("/api/trade", { method: "POST", json: { side: "buy", token: pick.token, symbol: pick.symbol, eth: "0.001", slippageBps: 500 } }).catch((e: Error) => e.message);
+if (typeof refused !== "string" || !/ETH to trade/.test(refused)) throw new Error(`live hand buy was not refused: ${JSON.stringify(refused)}`);
+console.log("ok  live hand buy refused:", refused.slice(0, 90));
 
 // --strategy: save a loose strategy through chat, wait for the minute tick to match a token, then approve it. The
 // throwaway wallet holds no ETH, so the approval must fail safely with the balance message (no transaction is sent).

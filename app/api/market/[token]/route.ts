@@ -1,7 +1,7 @@
 import { tokenMarket } from "@/lib/chain/market";
 import { api, query } from "@/lib/db";
 import { errorText, fail, requireTeam } from "@/lib/server/http";
-import { getExecutor, normalizeToken } from "@/lib/server/team";
+import { heldOf, normalizeToken } from "@/lib/server/team";
 
 /**
  * One token for the trade screen: its market numbers and pool, the team's fills in it, the open position with its
@@ -15,9 +15,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
   try {
     const [market, trades, open, held] = await Promise.all([
       tokenMarket(token).catch(() => null),
-      query(api.book.tradesFor, { owner: team.owner, token }),
-      query(api.book.open, { owner: team.owner }),
-      getExecutor().tokenBalance(team.wallet, token).catch(() => null),
+      query(api.book.tradesFor, { owner: team.owner, token, paper: team.mode === "paper" }),
+      query(api.book.open, { owner: team.owner, paper: team.mode === "paper" }),
+      heldOf(team, token).catch(() => null),
     ]);
     const mine = open.filter((p) => p.token === token);
     const hand = mine.find((p) => !p.strategyId);

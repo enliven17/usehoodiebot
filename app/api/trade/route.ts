@@ -2,7 +2,7 @@ import { parseEther } from "viem";
 
 import { api, mutate } from "@/lib/db";
 import { errorText, fail, requireTeam } from "@/lib/server/http";
-import { getExecutor, normalizeToken } from "@/lib/server/team";
+import { heldOf, normalizeToken } from "@/lib/server/team";
 import { auto } from "@/lib/server/tick";
 import { exitsOf, SPEC_LIMITS } from "@/lib/strategy";
 
@@ -29,7 +29,7 @@ export async function POST(req: Request) {
     } else {
       const pct = Number(b.pct);
       if (!(pct > 0 && pct <= 100)) throw new Error();
-      const held = await getExecutor().tokenBalance(team.wallet, token);
+      const held = await heldOf(team, token);
       amount = pct === 100 ? 0n : (held * BigInt(Math.round(pct * 100))) / 10_000n;
       if (pct < 100 && amount === 0n) return fail(400, `The wallet holds no ${symbol}.`);
     }
