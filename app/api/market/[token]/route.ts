@@ -2,6 +2,7 @@ import { tokenMarket } from "@/lib/chain/market";
 import { api, query } from "@/lib/db";
 import { errorText, fail, requireTeam } from "@/lib/server/http";
 import { heldOf, normalizeToken } from "@/lib/server/team";
+import { limited } from "@/lib/server/limit";
 
 /**
  * One token for the trade screen: its market numbers and pool, the team's fills in it, the open position with its
@@ -10,6 +11,8 @@ import { heldOf, normalizeToken } from "@/lib/server/team";
 export async function GET(_req: Request, { params }: { params: Promise<{ token: string }> }) {
   const team = await requireTeam();
   if (team instanceof Response) return team;
+  const slow = await limited(team.owner, "market");
+  if (slow) return slow;
   const token = normalizeToken((await params).token);
   if (!token) return fail(400, "Bad request.");
   try {

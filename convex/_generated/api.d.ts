@@ -18,7 +18,9 @@ import type * as crons from "../crons.js";
 import type * as events from "../events.js";
 import type * as fees from "../fees.js";
 import type * as guard from "../guard.js";
+import type * as limits from "../limits.js";
 import type * as memories from "../memories.js";
+import type * as sessions from "../sessions.js";
 import type * as strategies from "../strategies.js";
 import type * as teams from "../teams.js";
 
@@ -39,7 +41,9 @@ declare const fullApi: ApiFromModules<{
   events: typeof events;
   fees: typeof fees;
   guard: typeof guard;
+  limits: typeof limits;
   memories: typeof memories;
+  sessions: typeof sessions;
   strategies: typeof strategies;
   teams: typeof teams;
 }>;

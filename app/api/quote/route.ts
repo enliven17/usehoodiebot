@@ -3,6 +3,7 @@ import { parseEther } from "viem";
 import { afterFee, FEE_BPS } from "@/lib/server/fees";
 import { errorText, fail, requireTeam } from "@/lib/server/http";
 import { getExecutor, heldOf, normalizeToken } from "@/lib/server/team";
+import { limited } from "@/lib/server/limit";
 
 /**
  * What a trade would fill at right now, fees included, read from the curve or the pool: tokens out for a buy of `eth`,
@@ -11,6 +12,8 @@ import { getExecutor, heldOf, normalizeToken } from "@/lib/server/team";
 export async function GET(req: Request) {
   const team = await requireTeam();
   if (team instanceof Response) return team;
+  const slow = await limited(team.owner, "quote");
+  if (slow) return slow;
   const q = new URL(req.url).searchParams;
   const token = normalizeToken(q.get("token"));
   const side = q.get("side");

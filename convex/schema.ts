@@ -124,6 +124,12 @@ export default defineSchema({
   /** Notes the owner asked the team to keep across chats (risk limits, what they like); read into every chat. */
   memories: defineTable({ owner: v.string(), text: v.string() }).index("by_owner", ["owner"]),
 
+  /** Sign out everywhere: sessions issued before `before` are refused. */
+  revocations: defineTable({ owner: v.string(), before: v.number() }).index("by_owner", ["owner"]),
+
+  /** Rate-limit windows, one row per key (see convex/limits.ts). */
+  limits: defineTable({ key: v.string(), windowStart: v.number(), count: v.number() }).index("by_key", ["key"]),
+
   trades: defineTable({
     owner: v.string(),
     side: v.union(v.literal("buy"), v.literal("sell")),
