@@ -20,7 +20,37 @@ type Data = {
   trades: Array<{ owner: string; side: "buy" | "sell"; symbol: string; token: string; wei: string; hash: string; at: number }>;
   events: Array<{ owner: string; member: string; kind: string; text: string; at: number }>;
   applications: Application[];
+  usage: { owners: Usage[]; models: Usage[] };
 };
+type Usage = { key: string; jobs: number; finished: number; steps: number; tools: number; input: number; output: number };
+
+const tokens = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(2)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}k` : String(Math.round(n)));
+
+/** The comptroller's table: what each owner's (or model's) chats cost, per finished job, worst first. */
+function UsageTable({ rows, label, short: shorten }: { rows: Usage[]; label: string; short?: boolean }) {
+  if (!rows.length) return <p className="faint">No chats in the last 7 days.</p>;
+  return (
+    <div className={s.tableWrap}>
+      <table className={s.table}>
+        <thead><tr><th>{label}</th><th>Jobs</th><th>Finished</th><th>Steps / job</th><th>Tool calls</th><th>Tokens in</th><th>Tokens out</th><th>Per finished job</th></tr></thead>
+        <tbody>
+          {rows.map((u) => (
+            <tr key={u.key}>
+              <td className="num">{shorten ? short(u.key) : u.key}</td>
+              <td className="num">{u.jobs}</td>
+              <td className="num">{u.finished}</td>
+              <td className="num">{(u.steps / Math.max(1, u.jobs)).toFixed(1)}</td>
+              <td className="num">{u.tools}</td>
+              <td className="num">{tokens(u.input)}</td>
+              <td className="num">{tokens(u.output)}</td>
+              <td className="num">{tokens((u.input + u.output) / Math.max(1, u.finished))}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 const eth = (wei: string) => `${(Number(BigInt(wei)) / 1e18).toFixed(4).replace(/\.?0+$/, "") || "0"} ETH`;
@@ -131,6 +161,13 @@ export function Admin() {
             </li>
           ))}
         </ul>
+      </section>
+
+      <section className={s.section} aria-labelledby="usage-h">
+        <h2 id="usage-h">AI cost, last 7 days</h2>
+        <UsageTable rows={data?.usage.owners ?? []} label="Owner" short />
+        <h2 className={s.gap}>By model</h2>
+        <UsageTable rows={data?.usage.models ?? []} label="Model" />
       </section>
 
       <div className={s.cols}>

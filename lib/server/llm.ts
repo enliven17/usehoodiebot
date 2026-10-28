@@ -46,7 +46,7 @@ function providers(env = process.env): Provider[] {
 const cooldown = new Map<string, number>();
 const keyId = (key: string) => createHash("sha256").update(key).digest("hex").slice(0, 8);
 
-export type Completion = { message: Extract<ChatMessage, { role: "assistant" }>; provider: string; model: string };
+export type Completion = { message: Extract<ChatMessage, { role: "assistant" }>; provider: string; model: string; usage: { input: number; output: number } };
 
 /** One assistant turn. Throws only when every provider and key failed. */
 export async function complete(a: { messages: ChatMessage[]; tools: ToolDef[]; maxTokens?: number }): Promise<Completion> {
@@ -72,7 +72,7 @@ export async function complete(a: { messages: ChatMessage[]; tools: ToolDef[]; m
       }
       // Gemini wraps its errors in an array: [{ error: { message } }]
       const raw = (await res.json().catch(() => null)) as unknown;
-      const body = (Array.isArray(raw) ? raw[0] : raw) as { choices?: Array<{ message?: { content?: string | null; tool_calls?: ToolCall[] } }>; error?: { message?: string } } | null;
+      const body = (Array.isArray(raw) ? raw[0] : raw) as { choices?: Array<{ message?: { content?: string | null; tool_calls?: ToolCall[] } }>; usage?: { prompt_tokens?: number; completion_tokens?: number }; error?: { message?: string } } | null;
       const msg = body?.choices?.[0]?.message;
       // A 4xx here is this model's problem (an invented tool name, an unknown slug): move on, no cooldown.
       if (!res.ok || !msg) {
@@ -82,7 +82,7 @@ export async function complete(a: { messages: ChatMessage[]; tools: ToolDef[]; m
         continue;
       }
       const toolCalls = (msg.tool_calls ?? []).map((c, i) => ({ id: c.id || `call_${Date.now()}_${i}`, type: "function" as const, function: { name: c.function.name, arguments: c.function.arguments || "{}" } }));
-      return { message: { role: "assistant", content: msg.content ?? null, ...(toolCalls.length ? { tool_calls: toolCalls } : {}) }, provider: p.name, model };
+      return { message: { role: "assistant", content: msg.content ?? null, ...(toolCalls.length ? { tool_calls: toolCalls } : {}) }, provider: p.name, model, usage: { input: body?.usage?.prompt_tokens ?? 0, output: body?.usage?.completion_tokens ?? 0 } };
     } catch (err) {
       cooldown.set(id, Date.now() + 60_000);
       failures.push(`${id} ${err instanceof Error ? err.name : "error"}`);

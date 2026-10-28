@@ -2,6 +2,7 @@ import "server-only";
 
 import { api, mutate, query } from "../db";
 import type { StoredRow } from "../lines";
+import { capResult, diet } from "../context";
 import { complete, type ChatMessage } from "./llm";
 import { apiTools, runTool } from "./tools";
 import type { Team } from "./team";
@@ -24,7 +25,8 @@ ResearchBot also has find_token to look a token up by name or symbol, and techni
 You also have get_wallet for the team wallet.
 
 How you work:
-- Answer in a few short sentences, plain words, no headings, no markdown tables. Numbers with units. Token addresses shortened like 0x7ed5…ec7e.
+- Answer in a few short sentences, plain words, no headings, no markdown tables.
+- Spend tools like money: call one only when its answer changes what you say. Do not call the same tool twice for the same thing in one reply. When there is nothing worth doing, say so in one line; never list what you looked for and did not find. Numbers with units. Token addresses shortened like 0x7ed5…ec7e.
 - Only call the tools listed. Use the exact token address a tool gave you; never invent one.
 - Read the chart with technical_read when timing matters: say if the entry is early, late or mid-move.
 - Before saving or recommending a strategy, offer to backtest it; when you do, give win rate, average return and worst trade, and say it tests exits on tokens still listed.
@@ -88,12 +90,18 @@ export async function chat(team: Team, text: string): Promise<void> {
   };
   await append({ role: "user", content: text.slice(0, 4000) });
 
+  // the meter: every model call's tokens, booked once per owner message as one job
+  const used = { input: 0, output: 0, steps: 0, tools: 0, provider: "", model: "" };
+  const book = (finished: boolean) => mutate(api.usage.record, { owner: team.owner, ...used, finished }).catch(() => {});
   for (let step = 0; step < MAX_STEPS; step++) {
-    const { message } = await complete({ messages: [{ role: "system", content: system }, ...context], tools: apiTools() });
+    const { message, usage, provider, model } = await complete({ messages: [{ role: "system", content: system }, ...diet(context)], tools: apiTools() });
+    Object.assign(used, { input: used.input + usage.input, output: used.output + usage.output, steps: used.steps + 1, provider, model });
     await append(message);
-    if (!message.tool_calls?.length) return;
+    if (!message.tool_calls?.length) return void (await book(true));
+    used.tools += message.tool_calls.length;
     const results = await Promise.all(message.tool_calls.map(async (c) => ({ id: c.id, ...(await runTool(team, c.function.name, parseArgs(c.function.arguments))) })));
-    for (const r of results) await append({ role: "tool", tool_call_id: r.id, content: r.isError ? `Error: ${r.content}` : r.content });
+    for (const r of results) await append({ role: "tool", tool_call_id: r.id, content: capResult(r.isError ? `Error: ${r.content}` : r.content) });
   }
   await append({ role: "assistant", content: "I stopped there: that took more steps than I allow myself in one go. Ask me to carry on." });
+  await book(false);
 }

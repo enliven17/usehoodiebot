@@ -127,6 +127,9 @@ export default defineSchema({
   /** Sign out everywhere: sessions issued before `before` are refused. */
   revocations: defineTable({ owner: v.string(), before: v.number() }).index("by_owner", ["owner"]),
 
+  /** One row per owner message the brain answered: tokens in and out, model steps, tool calls, and whether it finished. */
+  usage: defineTable({ owner: v.string(), input: v.number(), output: v.number(), steps: v.number(), tools: v.number(), provider: v.string(), model: v.string(), finished: v.boolean() }),
+
   /** Rate-limit windows, one row per key (see convex/limits.ts). */
   limits: defineTable({ key: v.string(), windowStart: v.number(), count: v.number() }).index("by_key", ["key"]),
 

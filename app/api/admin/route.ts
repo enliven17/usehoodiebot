@@ -6,6 +6,6 @@ import { currentOwner } from "@/lib/session";
 /** Everything the admin page shows: platform numbers, every team, the latest trades and decisions, and applications. */
 export async function GET() {
   if (!isAdmin(await currentOwner())) return fail(404, "Not found.");
-  const [overview, applications] = await Promise.all([query(api.admin.overview, {}), query(api.applications.list, {})]);
-  return Response.json({ ...overview, applications });
+  const [overview, applications, usage] = await Promise.all([query(api.admin.overview, {}), query(api.applications.list, {}), query(api.usage.report, { days: 7 })]);
+  return Response.json({ ...overview, applications, usage });
 }
