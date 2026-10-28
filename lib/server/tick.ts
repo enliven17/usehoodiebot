@@ -40,7 +40,8 @@ export async function tick() {
 
 async function enter(s: Strategy, spec: Spec, market: Candidate[]) {
   const sid = s.id as Id<"strategies">;
-  const [open, pending] = await Promise.all([query(api.book.openForStrategy, { strategyId: sid }), query(api.approvals.pending, { owner: s.owner })]);
+  const book = (await getTeam(s.owner))?.mode === "paper";
+  const [open, pending] = await Promise.all([query(api.book.openForStrategy, { paper: book, strategyId: sid }), query(api.approvals.pending, { owner: s.owner })]);
   if (open.length + pending.filter((a) => a.strategyId === s.id && a.kind === "buy").length >= spec.maxOpen) return [];
   // ponytail: ShieldBot reads at most 3 new matches per strategy per tick (two GeckoTerminal calls each, cached)
   let checked = 0;
@@ -63,9 +64,11 @@ async function enter(s: Strategy, spec: Spec, market: Candidate[]) {
     await logEvent(s.owner, { member: "sniper", kind: "match", text: why, token: c.token, symbol: c.symbol });
     const team = (await getTeam(s.owner))!;
     // "auto" trades on its own only under Autopilot, and only inside its budget; anything else asks the owner
-    const held = s.mode === "auto" && team.autopilot.on ? await autoDeployed(s.owner) : 0;
-    const overBudget = held + Number(formatEther(wei)) > team.autopilot.budgetEth;
-    if (s.mode === "ask" || !team.autopilot.on || overBudget) {
+    // on paper no money is at risk: an automatic strategy fills without Autopilot or a budget
+    const paper = team.mode === "paper";
+    const held = !paper && s.mode === "auto" && team.autopilot.on ? await autoDeployed(s.owner) : 0;
+    const overBudget = !paper && held + Number(formatEther(wei)) > team.autopilot.budgetEth;
+    if (s.mode === "ask" || (!paper && (!team.autopilot.on || overBudget))) {
       const note = s.mode === "auto" ? (!team.autopilot.on ? " Autopilot is off, so it asks first." : ` That would take Autopilot past its ${team.autopilot.budgetEth} ETH budget, so it asks first.`) : "";
       await propose(s.owner, { kind: "buy", token: c.token, symbol: c.symbol, amount: wei, reason: `${why}${note}`, strategyId: s.id });
       await logEvent(s.owner, { member: "trader", kind: "ask", text: `Asked you to approve a ${eth(wei)} buy of ${c.symbol}.${note}`, token: c.token, symbol: c.symbol });
@@ -86,20 +89,22 @@ export async function autoDeployed(owner: string): Promise<number> {
 }
 
 /** Records a new high for each position whose price beat it; returns the high to measure a trailing stop from. */
-async function highs(open: Array<{ id: string; peakEth: number | null }>, prices: Map<string, number>, tokenOf: (id: string) => string) {
+async function highs(open: Array<{ id: string; peakEth: number | null; paper?: boolean }>, prices: Map<string, number>, tokenOf: (id: string) => string) {
   const out = new Map<string, number>();
   for (const p of open) {
     const price = prices.get(tokenOf(p.id));
     const peak = Math.max(p.peakEth ?? 0, price ?? 0);
     out.set(p.id, peak);
-    if (price !== undefined && price > (p.peakEth ?? 0)) await mutate(api.book.peak, { id: p.id as Id<"positions">, priceEth: price });
+    if (price !== undefined && price > (p.peakEth ?? 0)) await mutate(api.book.peak, { paper: !!p.paper, id: p.id, priceEth: price });
   }
   return out;
 }
 
 async function exit(s: Strategy, spec: Spec) {
   if (spec.takeProfitPct === undefined && spec.stopLossPct === undefined && spec.trailingStopPct === undefined) return [];
-  const open = await query(api.book.openForStrategy, { strategyId: s.id as Id<"strategies"> });
+  // both books: a strategy's live positions keep their exits while the team is on paper, and the other way round
+  const sid = s.id as Id<"strategies">;
+  const open = [...(await query(api.book.openForStrategy, { strategyId: sid })).map((p) => ({ ...p, paper: false })), ...(await query(api.book.openForStrategy, { paper: true, strategyId: sid })).map((p) => ({ ...p, paper: true }))];
   if (!open.length) return [];
   const prices = await getExecutor().prices(open.map((p) => p.token));
   const peaks = await highs(open, prices, (id) => open.find((p) => p.id === id)!.token);
@@ -111,13 +116,13 @@ async function exit(s: Strategy, spec: Spec) {
     if (!why) continue;
     const reason = `${s.name}: ${p.symbol} hit ${why} (${((price! / entry - 1) * 100).toFixed(0)}%).`;
     await logEvent(s.owner, { member: "sniper", kind: "exit", text: reason, token: p.token, symbol: p.symbol });
-    if (s.mode === "ask") {
+    if (s.mode === "ask" && !p.paper) {
       const pending = await query(api.approvals.pending, { owner: s.owner });
       if (!pending.some((a) => a.token === p.token && a.kind === "sell")) await propose(s.owner, { kind: "sell", token: p.token, symbol: p.symbol, amount: 0n, reason, strategyId: s.id });
       continue;
     }
     // Sell exactly this position, so a manual buy of the same token stays put.
-    const f = await auto((await getTeam(s.owner))!, { kind: "sell", token: p.token, symbol: p.symbol, amount: BigInt(p.tokens), slippageBps: spec.slippageBps, strategyId: s.id, positionId: p.id }, reason);
+    const f = await auto((await getTeam(s.owner))!, { kind: "sell", token: p.token, symbol: p.symbol, amount: BigInt(p.tokens), slippageBps: spec.slippageBps, strategyId: s.id, positionId: p.id, paper: p.paper }, reason);
     out.push(`${s.id}: ${f ? `sold ${p.symbol} (${why})` : "wallet busy"}`);
   }
   return out;
@@ -154,7 +159,7 @@ async function handExits() {
     if (!why) continue;
     const reason = `${p.symbol} hit your ${why} (${((price! / entry - 1) * 100).toFixed(0)}%).`;
     await logEvent(p.owner, { member: "trader", kind: "exit", text: reason, token: p.token, symbol: p.symbol });
-    const f = await auto((await getTeam(p.owner))!, { kind: "sell", token: p.token, symbol: p.symbol, amount: BigInt(p.tokens), slippageBps: 500, strategyId: null, positionId: p.id }, reason, `on your ${why}`);
+    const f = await auto((await getTeam(p.owner))!, { kind: "sell", token: p.token, symbol: p.symbol, amount: BigInt(p.tokens), slippageBps: 500, strategyId: null, positionId: p.id, paper: p.paper }, reason, `on your ${why}`);
     out.push(`${p.id}: ${f ? `sold ${p.symbol} (${why})` : "wallet busy"}`);
   }
   return out;

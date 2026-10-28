@@ -22,7 +22,8 @@ export const eth = (wei: bigint) => `${Number(formatEther(wei < 0n ? -wei : wei)
 export function fillEvent(kind: "buy" | "sell", symbol: string, token: string, f: { hash: string; wei: bigint; tokens: bigint }, how: string) {
   const amount = Number(f.tokens / 10n ** 12n) / 1e6; // whole tokens, 6 decimals are plenty for a timeline
   const qty = amount >= 1e6 ? `${(amount / 1e6).toFixed(2)}M` : amount >= 1e3 ? `${(amount / 1e3).toFixed(1)}k` : amount.toFixed(2);
+  const on = f.hash.startsWith("paper:") ? "On paper: " : "";
   return kind === "buy"
-    ? { member: "trader" as const, kind: "buy", text: `Bought ${qty} ${symbol} for ${eth(f.wei)} ${how}.`, token, symbol, hash: f.hash, wei: -f.wei }
-    : { member: "trader" as const, kind: "sell", text: `Sold ${qty} ${symbol} for ${eth(f.wei)} ${how}.`, token, symbol, hash: f.hash, wei: f.wei };
+    ? { member: "trader" as const, kind: "buy", text: `${on}Bought ${qty} ${symbol} for ${eth(f.wei)} ${how}.`, token, symbol, hash: f.hash, wei: -f.wei }
+    : { member: "trader" as const, kind: "sell", text: `${on}Sold ${qty} ${symbol} for ${eth(f.wei)} ${how}.`, token, symbol, hash: f.hash, wei: f.wei };
 }

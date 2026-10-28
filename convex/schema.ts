@@ -21,6 +21,9 @@ export default defineSchema({
      * while it is on, and only while what they hold stays within budgetEth; otherwise they ask, like "ask" strategies.
      */
     autopilot: v.optional(v.object({ on: v.boolean(), budgetEth: v.number(), since: v.number() })),
+    /** "paper" (the default) fills every trade at live quotes against paperWei; "live" trades the team wallet. */
+    mode: v.optional(v.union(v.literal("paper"), v.literal("live"))),
+    paperWei: v.optional(v.string()),
   }).index("by_owner", ["owner"]),
 
   /** Each chat message as JSON text (OpenAI-style: user, assistant with tool calls, tool results). */
@@ -122,6 +125,38 @@ export default defineSchema({
   memories: defineTable({ owner: v.string(), text: v.string() }).index("by_owner", ["owner"]),
 
   trades: defineTable({
+    owner: v.string(),
+    side: v.union(v.literal("buy"), v.literal("sell")),
+    token: v.string(),
+    symbol: v.string(),
+    wei: v.string(),
+    tokens: v.string(),
+    hash: v.string(),
+  })
+    .index("by_owner", ["owner"])
+    .index("by_owner_token", ["owner", "token"]),
+
+  /** Paper trading: the same book as positions and trades, filled at live quotes with no money moving. */
+  paperPositions: defineTable({
+    owner: v.string(),
+    strategyId: v.optional(v.id("strategies")),
+    token: v.string(),
+    symbol: v.string(),
+    tokens: v.string(),
+    costWei: v.string(),
+    closedAt: v.optional(v.number()),
+    proceedsWei: v.optional(v.string()),
+    /** Exits the owner set on a hand-bought position; the tick sells it when one is hit. */
+    takeProfitPct: v.optional(v.number()),
+    stopLossPct: v.optional(v.number()),
+    trailingStopPct: v.optional(v.number()),
+    /** the highest price (ETH per token) seen while held: what a trailing stop measures from */
+    peakEth: v.optional(v.number()),
+  })
+    .index("by_owner_open", ["owner", "closedAt"])
+    .index("by_open", ["closedAt"])
+    .index("by_strategy_open", ["strategyId", "closedAt"]),
+  paperTrades: defineTable({
     owner: v.string(),
     side: v.union(v.literal("buy"), v.literal("sell")),
     token: v.string(),

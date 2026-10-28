@@ -13,7 +13,8 @@ import { safeMessage } from "./errors";
 import { fillEvent, logEvent } from "./events";
 import { afterFee, FEE_WALLET, feeOf } from "./fees";
 
-export type Team = { owner: Address; wallet: Address; walletId: string; autopilot: { on: boolean; budgetEth: number } };
+export type Team = { owner: Address; wallet: Address; walletId: string; autopilot: { on: boolean; budgetEth: number }; mode: "paper" | "live"; paperWei: bigint };
+const PAPER_START = 10n ** 18n;
 export type Approval = Awaited<ReturnType<typeof propose>>;
 
 /** Approvals older than this are not traded: the market has moved. */
@@ -27,7 +28,7 @@ const strategyId = (id: string | null | undefined) => (id ?? undefined) as Id<"s
 
 export async function getTeam(owner: string): Promise<Team | null> {
   const t = await query(api.teams.get, { owner });
-  return t ? { owner: t.owner as Address, wallet: t.wallet as Address, walletId: t.walletId, autopilot: { on: t.autopilot?.on ?? false, budgetEth: t.autopilot?.budgetEth ?? 0 } } : null;
+  return t ? { owner: t.owner as Address, wallet: t.wallet as Address, walletId: t.walletId, autopilot: { on: t.autopilot?.on ?? false, budgetEth: t.autopilot?.budgetEth ?? 0 }, mode: t.mode ?? "paper", paperWei: BigInt(t.paperWei ?? PAPER_START) } : null;
 }
 
 /** The team's own wallet, created once, under a policy that only lets it trade Pons and pay the owner. */
@@ -37,7 +38,7 @@ export async function ensureTeam(owner: Address): Promise<Team> {
   const w = await getPrivy().createWalletWithPolicy((address) => robinhoodAgentPolicy(address, owner, null, FEE_WALLET));
   // ponytail: a lost race leaves one unused, unfunded wallet in Privy; harmless.
   const t = await mutate(api.teams.create, { owner, wallet: w.address, walletId: w.id, policyId: w.policyId });
-  return { owner, wallet: t.wallet as Address, walletId: t.walletId, autopilot: { on: false, budgetEth: 0 } };
+  return { owner, wallet: t.wallet as Address, walletId: t.walletId, autopilot: { on: false, budgetEth: 0 }, mode: "paper", paperWei: PAPER_START };
 }
 
 /** Runs `fn` holding the team's wallet lease, or returns null when another transaction is in flight. */
@@ -62,7 +63,8 @@ export class SentTrade extends Error {
  * Buy `amount` wei of a token, or sell `amount` tokens of it (0 = all held; `positionId` = the position this sell
  * closes). Books the fill from the receipt. Throws SentTrade when the send is ambiguous.
  */
-export async function trade(team: Team, a: { kind: "buy" | "sell"; token: string; symbol: string; amount: bigint; slippageBps: number; strategyId: string | null; positionId?: string; takeProfitPct?: number; stopLossPct?: number; trailingStopPct?: number }) {
+export async function trade(team: Team, a: { kind: "buy" | "sell"; token: string; symbol: string; amount: bigint; slippageBps: number; strategyId: string | null; positionId?: string; takeProfitPct?: number; stopLossPct?: number; trailingStopPct?: number; paper?: boolean }) {
+  if (a.paper ?? team.mode === "paper") return paperTrade(team, a);
   const ex = getExecutor();
   let hash: string | null = null;
   const base = { walletId: team.walletId, wallet: team.wallet, token: a.token, slippageBps: a.slippageBps, onSigned: async (h: string) => void (hash = h) };
@@ -85,6 +87,36 @@ export async function trade(team: Team, a: { kind: "buy" | "sell"; token: string
   await mutate(api.book.sold, { owner: team.owner, token: a.token, symbol: a.symbol, tokens: f.tokens.toString(), wei: (f.wei - fee).toString(), hash: f.hash, closes: tokens === held, positionId: a.positionId });
   await chargeFee(team, { side: "sell", token: a.token, wei: fee, tradeHash: f.hash });
   return { ...f, wei: f.wei - fee };
+}
+
+/**
+ * A trade on paper: filled at the live quote from the curve or pool, Hoodie's fee included, against the team's paper
+ * balance. Nothing is signed or sent. Books into the paper ledger exactly as a live fill books into the real one.
+ */
+async function paperTrade(team: Team, a: Parameters<typeof trade>[1]) {
+  const ex = getExecutor();
+  const hash = `paper:${randomUUID()}`;
+  if (a.kind === "buy") {
+    if (team.paperWei < a.amount) throw new Error(`The paper balance has ${formatEther(team.paperWei)} ETH; this needs ${formatEther(a.amount)}. Reset it in the wallet panel.`);
+    const tokens = await ex.quote(a.token, "buy", afterFee(a.amount));
+    if (tokens <= 0n) throw new Error(`No quote for ${a.symbol} right now.`);
+    await mutate(api.book.bought, { paper: true, owner: team.owner, strategyId: strategyId(a.strategyId), token: a.token, symbol: a.symbol, tokens: tokens.toString(), wei: a.amount.toString(), hash, takeProfitPct: a.takeProfitPct, stopLossPct: a.stopLossPct, trailingStopPct: a.trailingStopPct });
+    return { hash, wei: a.amount, tokens };
+  }
+  const open = (await query(api.book.open, { paper: true, owner: team.owner })).filter((p) => p.token === a.token);
+  const held = open.reduce((t, p) => t + BigInt(p.tokens), 0n);
+  const tokens = a.amount === 0n || held < a.amount ? held : a.amount;
+  if (tokens === 0n) throw new Error(`The paper book holds no ${a.symbol}.`);
+  const wei = afterFee(await ex.quote(a.token, "sell", tokens));
+  await mutate(api.book.sold, { paper: true, owner: team.owner, token: a.token, symbol: a.symbol, tokens: tokens.toString(), wei: wei.toString(), hash, closes: tokens === held, positionId: a.positionId });
+  return { hash, wei, tokens };
+}
+
+/** What the team holds of a token, in its current book: the paper ledger, or the wallet on chain. */
+export async function heldOf(team: Team, token: string): Promise<bigint> {
+  if (team.mode === "live") return getExecutor().tokenBalance(team.wallet, token);
+  const open = await query(api.book.open, { paper: true, owner: team.owner });
+  return open.filter((p) => p.token === token).reduce((t, p) => t + BigInt(p.tokens), 0n);
 }
 
 /**
