@@ -15,7 +15,7 @@ TraderBot and LaunchBot, and they trade Pons tokens from a wallet that belongs t
 |---|---|
 | Web | Next.js 16 on Vercel, plain CSS on Kurage tokens (`app/globals.css`) |
 | Data | Convex (`convex/`), called only from the Next server with `HOODIEBOT_SECRET` |
-| Brain | OpenRouter (Claude Sonnet 5.5), then Groq, then Gemini, keys rotating (`lib/server/llm.ts`, `brain.ts`, `tools.ts`) |
+| Brain | Token Harbor (free DeepSeek V4.1 Flash, DeepSeek V4 Flash, MiMo), then OpenRouter, Groq and Gemini, keys rotating (`lib/server/llm.ts`, `brain.ts`, `tools.ts`) |
 | Wallet connect | Family's ConnectKit + wagmi, Kurage theme (`components/app/Wallets.tsx`); `.npmrc` has legacy-peer-deps for its React 18 peer range |
 | Wallets | Privy server wallets under a deny-by-default policy (`lib/chain/policy.ts`) |
 | Chain | Robinhood Chain 4663, Pons V2 curves and Uniswap v4 (`lib/chain/`) |
@@ -46,7 +46,7 @@ Checks: `npm run typecheck`, `npm test`, `npx convex dev --once` (deploys and ty
 | `SESSION_SECRET` | Vercel | 32+ characters; signs the session cookie |
 | `CRON_SECRET` | Vercel + Convex | authorizes `/api/cron/tick` |
 | `SITE_URL` | Convex | e.g. `https://usehoodiebot.com`, where the cron sends the tick |
-| `OPENROUTER_API_KEYS`, `GROQ_API_KEYS`, `GEMINI_API_KEYS` | Vercel | the brain; comma-separated keys rotate, `*_MODELS` override the model order |
+| `TOKENHARBOR_API_KEYS`, `OPENROUTER_API_KEYS`, `GROQ_API_KEYS`, `GEMINI_API_KEYS` | Vercel | the brain, tried in that order (Token Harbor's free DeepSeek first); comma-separated keys rotate, `*_MODELS` override the model order |
 | `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | Vercel | Reown project; its domain allowlist must include the site |
 | `PRIVY_APP_ID`, `PRIVY_APP_SECRET` | Vercel | Privy app |
 | `PRIVY_AUTHORIZATION_KEY` | Vercel | `wallet-auth:…` P-256 key; owns every wallet and policy, required in production |

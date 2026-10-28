@@ -3,8 +3,9 @@ import "server-only";
 import { createHash } from "node:crypto";
 
 /**
- * Chat with tools over the OpenAI-compatible endpoints of Gemini, Groq and OpenRouter, using every key that is set
- * (GEMINI_API_KEYS, GROQ_API_KEYS, OPENROUTER_API_KEYS; comma separated). Providers are tried in order, keys in turn;
+ * Chat with tools over the OpenAI-compatible endpoints of Token Harbor, OpenRouter, Groq and Gemini, using every key
+ * that is set (TOKENHARBOR_API_KEYS, OPENROUTER_API_KEYS, GROQ_API_KEYS, GEMINI_API_KEYS; comma separated). Token
+ * Harbor's free DeepSeek and MiMo models go first: they call tools well and cost nothing. Providers are tried in order, keys in turn;
  * a key that is rate limited or failing sits out a cooldown, the call moves on. Keys never reach logs or errors.
  */
 
@@ -27,6 +28,11 @@ const list = (...values: Array<string | undefined>) => [...new Set(values.flatMa
  */
 function providers(env = process.env): Provider[] {
   return [
+    {
+      name: "tokenharbor", url: "https://tokenharbor.ai/v1/chat/completions",
+      models: list(env.TOKENHARBOR_MODELS).length ? list(env.TOKENHARBOR_MODELS) : ["deepseek-v4.1-flash:free", "deepseek-v4-flash:free", "mimo-v2.6-flash:free"],
+      keys: list(env.TOKENHARBOR_API_KEYS, env.TOKENHARBOR_API_KEY), cooldownMs: 5 * 60_000,
+    },
     {
       name: "openrouter", url: "https://openrouter.ai/api/v1/chat/completions", models: list(env.OPENROUTER_MODELS).length ? list(env.OPENROUTER_MODELS) : ["anthropic/claude-sonnet-5-5", "google/gemini-3.5-flash"],
       keys: list(env.OPENROUTER_API_KEYS, env.OPENROUTER_API_KEY), cooldownMs: 15 * 60_000,
