@@ -121,20 +121,19 @@ function body(name: Name): ReactNode {
     case "post-what":
       return (
         <div className={s.what}>
-          <Field />
-          <div className={s.whatHero}><div className={s.glow} /><div className={s.lift}><Hoodie size={420} still="neutral" /></div></div>
+          <div className={s.whatAura} />
+          <div className={s.whatHero}><Hoodie size={640} still="neutral" /></div>
           <div className={s.whatText}>
-            <h1 className={s.whatTitle}>Hoodie is your own <span className="grad">trading team.</span></h1>
-            <div className={s.steps}>
+            <h1 className={s.whatTitle}>Your own<br /><span className="grad">trading team.</span></h1>
+            <ol className={s.steps}>
               {[
-                ["Say it in plain words", "Ask what is moving. It researches and brings you a trade to approve."],
-                ["Checked before money goes in", "ShieldBot reads the creator, the holders and split buys, and blocks honeypots."],
-                ["Trades inside your budget", "Autopilot works only within the limit you set, from a wallet only you withdraw from."],
-              ].map(([h, p]) => (
-                <div key={h} className={s.step}><strong>{h}</strong><span>{p}</span></div>
+                ["Ask in plain words", "It researches and brings you a trade to approve."],
+                ["Checked first", "ShieldBot screens every token before money goes in."],
+                ["Inside your budget", "Autopilot never trades past the limit you set."],
+              ].map(([h, p], i) => (
+                <li key={h} className={s.step}><code>0{i + 1}</code><div><strong>{h}</strong><span>{p}</span></div></li>
               ))}
-            </div>
-            <div className={s.whatTeam}>{MEMBERS.map((m) => <Hoodie key={m} member={m} size={54} still="neutral" />)}</div>
+            </ol>
           </div>
         </div>
       );
