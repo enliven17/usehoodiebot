@@ -48,6 +48,8 @@ export function Plans({ info, onPaid }: { info: AccessInfo; onPaid: () => void }
       localStorage.removeItem(PENDING);
       onPaid();
     } catch (err) {
+      // a payment the server turned down is dropped; one still unconfirmed is kept for the next visit
+      if ((err as { status?: number }).status !== 409 || /already used/.test((err as Error).message)) localStorage.removeItem(PENDING);
       setError((err as Error).message);
     } finally {
       setBusy(null);
