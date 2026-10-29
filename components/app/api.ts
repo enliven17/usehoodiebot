@@ -5,8 +5,9 @@ import type { Snapshot } from "@/lib/server/snapshot";
 import type { Fill } from "./Chart";
 
 export type { Line, Snapshot };
-export type Access = "approved" | "pending" | "rejected" | "none" | "needs_token";
-export type TokenGate = { live: false } | { live: true; address: string; min: number; held: number | null };
+export type Access = "approved" | "pending" | "rejected" | "none" | "needs_plan";
+export type Plan = { id: string; name: string; days: number; eth: string };
+export type AccessInfo = { status: Access; admin: boolean; plan: { plan: string; until: number } | null; plans: Plan[]; payTo: string };
 export type Chat = { thread: number; title: string; at: number; open: boolean };
 export type MarketToken = Partial<Candidate> & { token: string; symbol: string; group: "held" | "traded" | "market" };
 export type TokenView = {
@@ -53,7 +54,8 @@ export const api = {
   strategy: (id: string, patch: { active?: boolean; mode?: "ask" | "auto" }) => call(`/api/strategies/${id}`, { method: "PATCH", json: patch }),
   deleteStrategy: (id: string) => call(`/api/strategies/${id}`, { method: "DELETE" }),
   withdraw: (eth: string) => call<{ hash: string }>("/api/withdraw", { method: "POST", json: { eth } }),
-  access: () => call<{ status: Access; admin: boolean; token: TokenGate }>("/api/access"),
+  access: () => call<AccessInfo>("/api/access"),
+  pay: (plan: string, hash: string) => call<{ plan: string; until: number }>("/api/plan", { method: "POST", json: { plan, hash } }),
   apply: (answers: Record<string, string | string[]>) => call<{ status: Access }>("/api/access", { method: "POST", json: { answers } }),
   nonce: () => call<{ nonce: string; issuedAt: string }>("/api/auth/nonce"),
   verify: (address: string, signature: string) => call<{ owner: string }>("/api/auth/verify", { method: "POST", json: { address, signature } }),

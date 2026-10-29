@@ -5,10 +5,9 @@ import { useEffect, useRef, useState } from "react";
 
 import { Hoodie } from "@/components/Hoodie";
 import { checkOne, QUESTIONS, type Answers, type Question } from "@/lib/apply";
-import { addressUrl } from "@/lib/chain/robinhood-urls";
-
-import { api, type TokenGate } from "./api";
+import { api, type AccessInfo } from "./api";
 import s from "./app.module.css";
+import { Plans } from "./Plans";
 
 const EASE = [0.2, 0.7, 0.2, 1] as const;
 const DRAFT = "hoodie-application";
@@ -24,9 +23,9 @@ const load = (): Answers => {
 
 /**
  * The way in: one question per screen, a draft kept in the browser, then a last look before sending. After sending, the
- * owner is on the waitlist; the app opens by itself once an admin approves them.
+ * owner is on the waitlist; once an admin approves them they pick a plan, and the app opens when it is paid.
  */
-export function Apply({ status, token, onSent, onSignOut }: { status: "none" | "pending" | "rejected" | "needs_token"; token: TokenGate; onSent: () => void; onSignOut: () => void }) {
+export function Apply({ status, info, onSent, onPaid, onSignOut }: { status: "none" | "pending" | "rejected" | "needs_plan"; info: AccessInfo | null; onSent: () => void; onPaid: () => void; onSignOut: () => void }) {
   const [at, setAt] = useState(0);
   const [answers, setAnswers] = useState<Answers>({});
   const [error, setError] = useState<string | null>(null);
@@ -50,16 +49,13 @@ export function Apply({ status, token, onSent, onSignOut }: { status: "none" | "
     return () => clearTimeout(t);
   }, [at]);
 
-  if (status === "needs_token" && token.live) {
+  if (status === "needs_plan" && info) {
     return (
       <div className={s.signin}>
-        <Hoodie size={120} mood="listening" />
-        <h1 className={s.signinTitle}>Hold $HOODIE to enter</h1>
-        <p className={s.signinText}>
-          You are approved. Hoodie is for $HOODIE holders: keep {token.min.toLocaleString("en-US")} $HOODIE in the wallet you signed in with
-          {token.held !== null ? ` (it holds ${Math.floor(token.held).toLocaleString("en-US")} now)` : ""}. This page opens your team by itself once it does.
-        </p>
-        <a className="btn btn-primary" href={addressUrl(token.address)} target="_blank" rel="noopener">View $HOODIE</a>
+        <Hoodie size={120} mood="happy" />
+        <h1 className={s.signinTitle}>{info.plan ? "Your plan has ended" : "You are in. Pick a plan"}</h1>
+        <p className={s.signinText}>Paid in ETH on Robinhood Chain, from the wallet you signed in with. Your team opens the moment the payment confirms.</p>
+        <Plans info={info} onPaid={onPaid} />
         <button type="button" className={s.linkish} onClick={onSignOut}>Sign out</button>
       </div>
     );
@@ -82,8 +78,8 @@ export function Apply({ status, token, onSent, onSignOut }: { status: "none" | "
 
   const review = at === QUESTIONS.length;
   const q = QUESTIONS[at];
-  const answered = QUESTIONS.filter((x) => x.kind !== "token" && !("error" in checkOne(x, answers[x.id])) && (answers[x.id]?.length ?? 0) > 0).length;
-  const total = QUESTIONS.filter((x) => x.kind !== "token").length;
+  const answered = QUESTIONS.filter((x) => !("error" in checkOne(x, answers[x.id])) && (answers[x.id]?.length ?? 0) > 0).length;
+  const total = QUESTIONS.length;
 
   const go = (n: number) => {
     setError(null);
@@ -144,22 +140,19 @@ export function Apply({ status, token, onSent, onSignOut }: { status: "none" | "
               <h1 className={s.askTitle}>All set. Send it over?</h1>
               <p className={s.qHint}>We read every application by hand. Tap an answer to change it.</p>
               <ul className={s.recap}>
-                {QUESTIONS.map((x, i) =>
-                  x.kind === "token" ? null : (
-                    <li key={x.id}>
-                      <button type="button" onClick={() => go(i)}>
-                        <span className="faint">{x.label}</span>
-                        <span>{Array.isArray(answers[x.id]) ? (answers[x.id] as string[]).join(", ") || "–" : String(answers[x.id] || "–")}</span>
-                      </button>
-                    </li>
-                  ),
-                )}
+                {QUESTIONS.map((x, i) => (
+                  <li key={x.id}>
+                    <button type="button" onClick={() => go(i)}>
+                      <span className="faint">{x.label}</span>
+                      <span>{Array.isArray(answers[x.id]) ? (answers[x.id] as string[]).join(", ") || "–" : String(answers[x.id] || "–")}</span>
+                    </button>
+                  </li>
+                ))}
               </ul>
             </>
           ) : (
             <Ask
               q={q!}
-              live={token.live}
               value={answers[q!.id]}
               input={input}
               onChange={(v) => {
@@ -177,7 +170,7 @@ export function Apply({ status, token, onSent, onSignOut }: { status: "none" | "
       <div className={s.applyNav}>
         {at > 0 ? <button type="button" className="btn" onClick={() => go(at - 1)} disabled={busy}>Back</button> : <span />}
         <button ref={submit} type="submit" className="btn btn-primary" disabled={busy}>
-          {review ? (busy ? "Sending…" : "Send application") : q?.kind === "token" ? "Continue" : q?.optional && !answers[q.id]?.length ? "Skip" : "OK"}
+          {review ? (busy ? "Sending…" : "Send application") : q?.optional && !answers[q.id]?.length ? "Skip" : "OK"}
         </button>
       </div>
       {!review ? <p className={`${s.enterHint} faint`}>or press Enter ↵</p> : null}
@@ -185,28 +178,9 @@ export function Apply({ status, token, onSent, onSignOut }: { status: "none" | "
   );
 }
 
-function Ask({ q, live, value, input, onChange }: { q: Question; live: boolean; value: string | string[] | undefined; input: React.RefObject<(HTMLInputElement & HTMLTextAreaElement) | null>; onChange: (v: string | string[]) => void }) {
+function Ask({ q, value, input, onChange }: { q: Question; value: string | string[] | undefined; input: React.RefObject<(HTMLInputElement & HTMLTextAreaElement) | null>; onChange: (v: string | string[]) => void }) {
   const title = <h1 className={s.askTitle}>{q.label}{q.optional ? <span className="faint"> · optional</span> : null}</h1>;
   const hint = q.hint ? <p className={s.qHint}>{q.hint}</p> : null;
-  if (q.kind === "token" && live) {
-    return (
-      <>
-        <h1 className={s.askTitle}>{q.label}</h1>
-        <p className={s.qHint}>We read it from the wallet you signed in with when you send the application. Holders move to the front of the line.</p>
-      </>
-    );
-  }
-  if (q.kind === "token") {
-    return (
-      <>
-        {title}
-        <div className={s.options} aria-disabled>
-          {["Yes, I hold $HOODIE", "Not yet"].map((o) => <button key={o} type="button" className={s.option} disabled>{o}</button>)}
-        </div>
-        {hint}
-      </>
-    );
-  }
   if (q.kind === "choice" || q.kind === "multi") {
     const multi = q.kind === "multi";
     const picked = multi ? ((value as string[] | undefined) ?? []) : value ? [value as string] : [];

@@ -4,7 +4,6 @@ import { test } from "node:test";
 import { checkAnswers } from "./apply";
 
 const good = {
-  hoodie: "yes",
   x: "https://x.com/hood_ie?s=20",
   telegram: "@hoodie_tg",
   experience: "Seasoned, 1 to 3 years",
@@ -13,9 +12,8 @@ const good = {
   why: "I trade Pons launches every day.",
 };
 
-test("checkAnswers cleans handles, keeps known options and never takes a $HOODIE answer", () => {
-  assert.deepEqual(checkAnswers(good), {
-    hoodie: "not live",
+test("checkAnswers cleans handles and keeps known options", () => {
+  assert.deepEqual(checkAnswers({ ...good, hoodie: "yes" }), {
     x: "hood_ie",
     telegram: "hoodie_tg",
     experience: "Seasoned, 1 to 3 years",

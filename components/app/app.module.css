@@ -447,3 +447,8 @@
 .switch span { width: 20px; height: 20px; border-radius: 50%; background: var(--text) }
 .switch[aria-checked="true"] { justify-content: flex-end; background: var(--cyan-200) }
 .switch[aria-checked="true"] span { background: var(--ink-950) }
+
+.plans { display: flex; flex-direction: column; gap: 12px; width: 100%; margin-top: 10px; text-align: left }
+.plans .option { justify-content: space-between }
+.plans > p.faint { margin: 0; font-size: 13px; text-align: center }
+.planName { color: var(--text) }

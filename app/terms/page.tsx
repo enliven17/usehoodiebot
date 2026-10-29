@@ -24,8 +24,8 @@ export default function Terms() {
       <p>
         Hoodie takes 0.5% of the ETH in every buy and every sell your team makes, by hand, by approval or automatically, sent from the
         team wallet right after the trade. The order ticket shows it before you trade. Network fees are on top. Access is by
-        application; once $HOODIE launches, using Hoodie also takes holding the amount of $HOODIE the app shows in the wallet you sign in
-        with. Fees and the holding can change; the app always shows the current ones.
+        application, then a monthly or yearly plan paid in ETH from the wallet you sign in with. Plans are not refunded and do not renew
+        by themselves. Fees and prices can change; the app always shows the current ones.
       </p>
       <h2>No advice, no guarantees</h2>
       <p>

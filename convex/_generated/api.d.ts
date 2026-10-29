@@ -22,6 +22,7 @@ import type * as limits from "../limits.js";
 import type * as memories from "../memories.js";
 import type * as sessions from "../sessions.js";
 import type * as strategies from "../strategies.js";
+import type * as subscriptions from "../subscriptions.js";
 import type * as teams from "../teams.js";
 import type * as usage from "../usage.js";
 
@@ -46,6 +47,7 @@ declare const fullApi: ApiFromModules<{
   memories: typeof memories;
   sessions: typeof sessions;
   strategies: typeof strategies;
+  subscriptions: typeof subscriptions;
   teams: typeof teams;
   usage: typeof usage;
 }>;

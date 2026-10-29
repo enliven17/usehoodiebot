@@ -51,7 +51,7 @@ Checks: `npm run typecheck`, `npm test`, `npx convex dev --once` (deploys and ty
 | `PRIVY_APP_ID`, `PRIVY_APP_SECRET` | Vercel | Privy app |
 | `PRIVY_AUTHORIZATION_KEY` | Vercel | `wallet-auth:…` P-256 key; owns every wallet and policy, required in production |
 | `ROBINHOOD_RPC` | Vercel | a provider endpoint; the public RPC is rate limited |
-| `NEXT_PUBLIC_HOODIE_CA` | Vercel | optional; shows the $HOODIE contract on the landing page |
+| `PLAN_MONTH_ETH`, `PLAN_YEAR_ETH` | Vercel | plan prices in ETH (default 0.01 and 0.1), paid to `FEE_WALLET` |
 
 ## Deploy
 

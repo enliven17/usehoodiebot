@@ -27,9 +27,6 @@
 .scroll { margin-top: 48px; color: var(--text-faint); font-family: var(--font-mono); font-size: 12px }
 
 /* contract */
-.ca { display: flex; align-items: center; gap: 12px; margin-top: 28px; padding: 8px 8px 8px 16px; border-radius: 14px; max-width: 100% }
-.ca code { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); font-size: 13px; color: var(--text-2) }
-.ca strong { font-weight: 500; font-size: 14px }
 
 /* sections */
 .section { position: relative; width: min(1120px, 100% - 32px); margin: 0 auto; padding: 120px 0 0 }

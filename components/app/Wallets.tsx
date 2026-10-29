@@ -3,7 +3,7 @@
 /**
  * Wallet connect through Family's ConnectKit: injected wallets (Robinhood Wallet, MetaMask, Rabby…), Coinbase Wallet
  * and WalletConnect (QR and mobile) behind one modal, dressed in the Kurage tokens. Mounted only in /app, so the
- * landing page never loads wagmi. The connected wallet only signs the sign-in message; it never sends a transaction.
+ * landing page never loads wagmi. The connected wallet signs the sign-in message and, once, pays for a plan.
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ConnectKitProvider, getDefaultConfig } from "connectkit";

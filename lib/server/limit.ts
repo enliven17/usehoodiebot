@@ -14,6 +14,7 @@ export const LIMITS = {
   chatDay: [300, 24 * 60 * MIN],
   trade: [20, MIN],
   withdraw: [5, MIN],
+  pay: [10, MIN],
   quote: [90, MIN],
   market: [60, MIN],
   read: [120, MIN],

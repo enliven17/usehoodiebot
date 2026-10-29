@@ -74,10 +74,10 @@ export default function Litepaper() {
         has a minimum output set from your slippage, and every position is booked from the transaction receipt, never from the quote.
       </p>
 
-      <h2>$HOODIE</h2>
+      <h2>Plans</h2>
       <p>
-        $HOODIE is the team&apos;s token, launched on Pons. The contract address is posted on the home page and on X when it is live;
-        anything else claiming to be $HOODIE is not.
+        Hoodie is paid for with a plan, monthly or yearly, in ETH on Robinhood Chain from the wallet you sign in with. There is no
+        Hoodie token: anything claiming to be one is not ours.
       </p>
 
       <h2>Risks</h2>

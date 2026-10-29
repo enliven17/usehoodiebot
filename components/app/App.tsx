@@ -10,12 +10,13 @@ import { Hoodie, type Mood } from "@/components/Hoodie";
 import { Mark } from "@/components/Logo";
 import { ShimmeringText } from "@/components/ui/ShimmeringText";
 
-import { api, type Access, type Line, type Snapshot, type TokenGate } from "./api";
+import { api, type Access, type AccessInfo, type Line, type Snapshot } from "./api";
 import { Agents } from "./Agents";
 import { Apply } from "./Apply";
 import s from "./app.module.css";
 import { History } from "./History";
 import { Message } from "./Message";
+import { PlanBlock } from "./Plans";
 import { Approvals, Positions, SideSkeleton, Strategies, TeamStrip, Wallet } from "./Side";
 import { SignIn } from "./SignIn";
 import { Timeline } from "./Timeline";
@@ -41,7 +42,7 @@ export function App({ signedIn }: { signedIn: boolean }) {
   // let in yet? null while it is being asked
   const [gate, setGate] = useState<Access | null>(null);
   const [admin, setAdmin] = useState(false);
-  const [tokenGate, setTokenGate] = useState<TokenGate>({ live: false });
+  const [info, setInfo] = useState<AccessInfo | null>(null);
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
   const [text, setText] = useState("");
@@ -64,18 +65,20 @@ export function App({ signedIn }: { signedIn: boolean }) {
   }, []);
 
   // where the application stands; a pending one is asked again now and then so the app opens the moment it is approved
+  const [asked, setAsked] = useState(0);
   useEffect(() => {
     if (!authed) return setGate(null);
     let live = true;
     const ask = () =>
-      api.access().then((r) => live && (setGate(r.status), setAdmin(r.admin), setTokenGate(r.token))).catch((err) => live && (err as { status?: number }).status === 401 && setAuthed(false));
+      api.access().then((r) => live && (setGate(r.status), setAdmin(r.admin), setInfo(r))).catch((err) => live && (err as { status?: number }).status === 401 && setAuthed(false));
     void ask();
     const t = setInterval(() => !document.hidden && ask(), 20_000);
     return () => {
       live = false;
       clearInterval(t);
     };
-  }, [authed]);
+  }, [authed, asked]);
+  const reask = () => setAsked((n) => n + 1);
 
   useEffect(() => {
     if (!authed || gate !== "approved") return;
@@ -140,7 +143,7 @@ export function App({ signedIn }: { signedIn: boolean }) {
       <>
         <Field />
         <motion.main className={s.solo} initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.45, ease: EASE }}>
-          {gate === null ? <Hoodie size={96} mood="thinking" /> : <Apply status={gate} token={tokenGate} onSent={() => setGate("pending")} onSignOut={() => api.logout().then(() => setAuthed(false))} />}
+          {gate === null ? <Hoodie size={96} mood="thinking" /> : <Apply status={gate} info={info} onSent={() => setGate("pending")} onPaid={reask} onSignOut={() => api.logout().then(() => setAuthed(false))} />}
         </motion.main>
       </>
     );
@@ -281,6 +284,7 @@ export function App({ signedIn }: { signedIn: boolean }) {
             <motion.div key="panels" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: EASE }}>
               <Approvals snap={snap} onChange={refresh} />
               <Wallet snap={snap} onChange={refresh} />
+              {info ? <PlanBlock info={info} onPaid={reask} /> : null}
               <Timeline snap={snap} />
               <Positions snap={snap} />
               <Strategies snap={snap} onChange={refresh} />
