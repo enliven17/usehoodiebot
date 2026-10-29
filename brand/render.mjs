@@ -13,6 +13,7 @@ const ALL = {
   "og-app": [1200, 630, "../public/og/app.png"],
   "post-intro": [1600, 900, "posts/intro.png"],
   "post-wallet": [1600, 900, "posts/wallet.png"],
+  "post-what": [1600, 900, "posts/what.png"],
   "kit-logo": [1600, 900, "kit/logo.png"],
   "kit-colour": [1600, 900, "kit/colour.png"],
   "kit-type": [1600, 900, "kit/type.png"],

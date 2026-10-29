@@ -17,6 +17,7 @@ export const KITS = {
   "og-app": { w: 1200, h: 630 },
   "post-intro": { w: 1600, h: 900 },
   "post-wallet": { w: 1600, h: 900 },
+  "post-what": { w: 1600, h: 900 },
   "kit-logo": { w: 1600, h: 900 },
   "kit-colour": { w: 1600, h: 900 },
   "kit-type": { w: 1600, h: 900 },
@@ -115,6 +116,26 @@ function body(name: Name): ReactNode {
             ))}
           </div>
           <Team size={70} />
+        </div>
+      );
+    case "post-what":
+      return (
+        <div className={s.what}>
+          <Field />
+          <div className={s.whatHero}><div className={s.glow} /><div className={s.lift}><Hoodie size={420} still="neutral" /></div></div>
+          <div className={s.whatText}>
+            <h1 className={s.whatTitle}>Hoodie is your own <span className="grad">trading team.</span></h1>
+            <div className={s.steps}>
+              {[
+                ["Say it in plain words", "Ask what is moving. It researches and brings you a trade to approve."],
+                ["Checked before money goes in", "ShieldBot reads the creator, the holders and split buys, and blocks honeypots."],
+                ["Trades inside your budget", "Autopilot works only within the limit you set, from a wallet only you withdraw from."],
+              ].map(([h, p]) => (
+                <div key={h} className={s.step}><strong>{h}</strong><span>{p}</span></div>
+              ))}
+            </div>
+            <div className={s.whatTeam}>{MEMBERS.map((m) => <Hoodie key={m} member={m} size={54} still="neutral" />)}</div>
+          </div>
         </div>
       );
     case "kit-logo":

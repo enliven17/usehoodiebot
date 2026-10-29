@@ -1,0 +1,9 @@
+What is Hoodie?
+
+A trading team on Robinhood Chain that answers to you.
+
+Ask what is moving, or say what to buy, in plain words. Hoodie researches it and brings you a trade to approve.
+
+ShieldBot checks every token before money goes in: the creator, the holders, split buys, honeypots.
+
+Autopilot trades only inside the budget you set, from a wallet only you can withdraw from.

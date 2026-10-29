@@ -46,3 +46,14 @@
 .typeBody { max-width: 52rem; margin: 0; font-size: 26px; line-height: 1.5; color: var(--text-2) }
 .typeMono { margin: 0; font-family: var(--font-mono); font-size: 30px; color: var(--text-2) }
 .typeMeta { margin: -14px 0 8px; font-family: var(--font-mono); font-size: 14px; color: var(--text-faint) }
+
+.what { position: relative; display: grid; grid-template-columns: 520px 1fr; align-items: center; gap: 24px; width: 100%; height: 100%; padding: 72px 96px 72px 56px }
+.what > :not(:first-child) { position: relative; z-index: 2 }
+.whatHero { position: relative; display: grid; place-items: center; height: 100% }
+.whatText { display: flex; flex-direction: column; gap: 36px; padding: 28px 32px; border-radius: 28px; background: radial-gradient(closest-side, rgba(4, 6, 10, .92), rgba(4, 6, 10, .7) 75%, transparent) }
+.whatTitle { margin: 0; font-size: 72px; font-weight: 300; line-height: 1.04; letter-spacing: -.05em; text-wrap: balance }
+.steps { display: flex; flex-direction: column; gap: 14px }
+.step { display: flex; flex-direction: column; gap: 6px; padding: 20px 24px; border-radius: 20px; border: 1px solid var(--border); background: #090c12 }
+.step strong { font-size: 24px; font-weight: 500 }
+.step span { font-size: 18px; line-height: 1.45; color: var(--text-muted) }
+.whatTeam { display: flex; gap: 10px; align-items: flex-end }
