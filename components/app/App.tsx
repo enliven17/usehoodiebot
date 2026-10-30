@@ -51,7 +51,7 @@ export function App({ signedIn }: { signedIn: boolean }) {
   const [error, setError] = useState<string | null>(null);
   const [panel, setPanel] = useState<Panel>("chat");
   // the team wallet panel, open or shut per view: open beside the chat, shut beside the trade ticket until asked for
-  const [sideOpen, setSideOpen] = useState({ chat: true, trade: false });
+  const [sideOpen, setSideOpen] = useState({ chat: true, trade: false, activity: false });
   const [tradePick, setTradePick] = useState<TokenPick | null>(null);
   const openChart = (pick: TokenPick) => { setTradePick(pick); setPanel("trade"); };
   const bottom = useRef<HTMLDivElement>(null);
@@ -153,7 +153,7 @@ export function App({ signedIn }: { signedIn: boolean }) {
     );
   }
 
-  const sideKey = panel === "trade" ? "trade" : "chat";
+  const sideKey = panel === "activity" ? "activity" : panel === "trade" ? "trade" : "chat";
   // phones and tablets show the panel as its own page; wider screens slide it open and shut beside the view
   const toggleWallet = () =>
     window.matchMedia("(max-width: 65rem)").matches ? setPanel((p) => (p === "team" ? "chat" : "team")) : setSideOpen((o) => ({ ...o, [sideKey]: !o[sideKey] }));

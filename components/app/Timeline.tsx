@@ -2,6 +2,8 @@
 
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
+import { Hoodie } from "@/components/Hoodie";
+
 import { addressUrl, txUrl } from "@/lib/chain/robinhood-urls";
 import { ago } from "@/lib/format";
 import { TEAM, type Member } from "@/lib/team";
@@ -18,13 +20,13 @@ const ethOf = (wei: string) => {
  * What the team decided and did, newest first: each specialist in its own colour, what it saw, what it asked, what it
  * bought and sold, with the ETH that moved and the transaction behind it.
  */
-export function Timeline({ snap, onOpen }: { snap: Snapshot; onOpen?: (pick: { token: string; symbol: string }) => void }) {
+export function Timeline({ snap, onOpen, plain = false, emptyText }: { snap: Snapshot; onOpen?: (pick: { token: string; symbol: string }) => void; plain?: boolean; emptyText?: string }) {
   const reduce = useReducedMotion();
   return (
-    <section className={s.block} aria-labelledby="tl-h">
-      <h2 id="tl-h" className={s.blockTitle}>Decisions</h2>
+    <section className={plain ? s.activityTimeline : s.block} aria-labelledby="tl-h">
+      <h2 id="tl-h" className={plain ? "sr-only" : s.blockTitle}>Decisions</h2>
       {!snap.events.length ? (
-        <p className="faint" style={{ fontSize: 14, margin: 0 }}>Nothing yet. Every scan, match, ask, buy and sell your team makes shows up here.</p>
+        <p className={plain ? s.activityEmpty : "faint"} style={plain ? undefined : { fontSize: 14, margin: 0 }}>{emptyText ?? "Nothing yet. Every scan, match, ask, buy and sell your team makes shows up here."}</p>
       ) : (
         <ol className={s.timeline}>
           <AnimatePresence initial={false}>
@@ -41,7 +43,7 @@ export function Timeline({ snap, onOpen }: { snap: Snapshot; onOpen?: (pick: { t
                   data-kind={e.kind}
                   style={{ ["--eye" as string]: m.eyes }}
                 >
-                  <span className={s.eventMark} aria-hidden />
+                  {plain ? <Hoodie member={e.member in TEAM ? e.member as Member : "hoodiebot"} size={24} mood="idle" /> : <span className={s.eventMark} aria-hidden />}
                   <div className={s.eventBody}>
                     <p className={s.eventHead}>
                       <strong>{m.name}</strong>

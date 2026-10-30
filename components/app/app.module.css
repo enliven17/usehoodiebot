@@ -212,37 +212,77 @@
 .dataNotice { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--text-muted); font-size: 12px }
 .main[data-view="activity"] { background: rgba(4, 6, 10, .94) }
 .main[data-view="activity"] > .thread, .main[data-view="activity"] > .composer { display: none }
-.activity { flex: 1; min-height: 0; overflow-y: auto; padding: 28px clamp(16px, 3vw, 40px); scrollbar-width: thin }
-.activityHead { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 24px }
-.activityHead h1 { margin: 8px 0; font-size: clamp(24px, 3vw, 36px); font-weight: 400; letter-spacing: -.035em }
-.activityHead p { margin: 0; line-height: 1.6; font-size: 14px }
-.activityHead .eyebrow { font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: var(--cyan-200) }
-.liveStatus { flex: none; padding: 7px 10px; border: 1px solid var(--border); border-radius: 20px; font-size: 11px; color: var(--text-muted) }
-.overview { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0 0 20px }
-.overview > div { padding: 18px; border: 1px solid var(--border); border-radius: 14px; background: rgba(255,255,255,.025) }
-.overview dt { font-size: 12px; color: var(--text-muted) }
-.overview dd { margin: 10px 0 0; font-size: clamp(16px, 1.8vw, 23px); overflow-wrap: anywhere }
-.agentCards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 22px }
-.agentCard { padding: 14px; border: 1px solid var(--border); border-top: 2px solid var(--eye); border-radius: 12px; background: rgba(255,255,255,.02) }
-.agentCard > div { display: flex; align-items: center; gap: 8px }
-.agentCard strong { font-size: 13px; font-weight: 500 }
-.agentCard p { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; font-size: 12px; line-height: 1.6; color: var(--text-muted); min-height: 38px }
-.agentCard time { font-size: 11px }
-.activityGrid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 28px }
-.activityFeed > .block { padding-top: 8px }
-.activityTrade { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 8px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 12px }
-.activityTrade strong { font-weight: 500; overflow: hidden; text-overflow: ellipsis }
-.activityTrade > :last-child { grid-column: 2 / -1; font-size: 11px; color: var(--text-muted) }
+.activity { flex: 1; min-height: 0; overflow-y: auto; padding: 40px clamp(20px, 4vw, 64px); scrollbar-width: thin }
+.activityInner { width: 100%; max-width: 1160px; margin-inline: auto }
+.activityHead { display: flex; align-items: baseline; gap: 16px; margin-bottom: 28px }
+.activityHead h1 { margin: 0; font-size: 24px; font-weight: 500; letter-spacing: -.035em }
+.activityHead > span { font-size: 12px; color: var(--text-faint) }
+.activityBalance { display: flex; flex-wrap: wrap; gap: 20px 48px; margin: 0 0 40px }
+.activityBalance dt { margin-bottom: 8px; font-size: 12px; color: var(--text-muted) }
+.activityBalance dd { margin: 0; font-size: clamp(16px, 1.5vw, 20px); letter-spacing: -.035em }
+.activityLayout { display: grid; grid-template-columns: minmax(0, 1fr) 260px; grid-template-areas: "feed positions" "feed team"; grid-template-rows: auto 1fr; gap: 36px 56px; align-items: start }
+.activityFeed { grid-area: feed; min-width: 0 }
+.activityTabs { display: flex; gap: 24px; border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none }
+.activityTabs button { flex: none; padding: 0 0 14px; border-bottom: 1px solid transparent; margin-bottom: -1px; color: var(--text-faint); font-size: 13px; transition: color .15s }
+.activityTabs button:hover { color: var(--text) }
+.activityTabs button[aria-pressed="true"] { color: var(--text); border-bottom-color: var(--text-2) }
+.activityTimeline .event { grid-template-columns: 24px minmax(0, 1fr); gap: 14px; padding: 22px 0 }
+.activityTimeline .event + .event { border-top-color: var(--border) }
+.activityTimeline .eventHead { align-items: baseline; font-size: 12px }
+.activityTimeline .eventHead time { color: var(--text-faint); font-size: 11px }
+.activityTimeline .eventText { margin: 8px 0 0; font-size: 14px; line-height: 1.7; color: var(--text-2); overflow-wrap: anywhere }
+.activityTimeline .eventMeta { margin-top: 10px; gap: 14px; font-size: 12px }
+.activityTimeline .eventMeta .linkish { padding: 0; font-size: 12px; text-decoration: none; color: var(--text-muted) }
+.activityTimeline .eventMeta .linkish:hover { color: var(--text) }
+.activityPositions { grid-area: positions; min-width: 0 }
+.activityPositions h2, .activityTeam h2 { display: flex; align-items: baseline; justify-content: space-between; margin: 0 0 16px; font-size: 13px; font-weight: 500 }
+.activityPositions h2 span { color: var(--text-faint); font-size: 12px }
+.activityPositions ul { margin: 0; padding: 0; list-style: none }
+.activityPosition { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px 12px; width: 100%; padding: 12px 0; text-align: left; font-size: 12px }
+.activityPositions li + li { border-top: 1px solid var(--border) }
+.activityPosition strong { font-weight: 500; font-size: 13px; overflow-wrap: anywhere }
+.activityPosition > :nth-child(even) { text-align: right }
+.activityPosition:hover strong { text-decoration: underline; text-underline-offset: 4px }
+.activityCost { font-size: 11px; color: var(--text-faint) }
+.activityTeam { grid-area: team; min-width: 0 }
+.activityAgent summary { display: flex; align-items: center; gap: 9px; padding: 10px 0; list-style: none; cursor: pointer; font-size: 12px; color: var(--text-muted) }
+.activityAgent summary::-webkit-details-marker { display: none }
+.activityAgent summary:hover { color: var(--text) }
+.activityAgent summary time { margin-left: auto; flex: none; font-size: 10px; color: var(--text-faint) }
+.activityChevron { font-size: 16px; color: var(--text-faint); transition: transform .15s }
+.activityAgent[open] .activityChevron { transform: rotate(90deg) }
+.activityAgent p { margin: 0 0 14px 33px; font-size: 12px; line-height: 1.7; color: var(--text-muted); overflow-wrap: anywhere }
+.activityEmpty { margin: 0; padding: 24px 0; font-size: 13px; color: var(--text-faint); line-height: 1.6 }
+.activityPositions .activityEmpty { padding: 8px 0 }
+.activityTrades { width: 100%; border-collapse: collapse; font-size: 13px }
+.activityTrades th { padding: 16px 0 12px; color: var(--text-faint); font-size: 11px; font-weight: 400; text-align: left }
+.activityTrades th:not(:first-child), .activityTrades td:not(:first-child) { text-align: right; white-space: nowrap }
+.activityTrades td { padding: 18px 0; border-bottom: 1px solid var(--border); vertical-align: top }
+.activityTrades td + td { padding-left: 12px }
+.activityTradeName { display: flex; gap: 12px; align-items: baseline; overflow-wrap: anywhere }
+.activityTradeName strong, .activityTradeName button { font-weight: 500; text-align: left }
+.activityTradeName button:hover { text-decoration: underline; text-underline-offset: 4px }
+.activityTradeMode { display: block; margin-top: 6px; color: var(--text-faint); font-size: 11px }
+.activityTrades td:last-child { color: var(--text-faint); font-size: 11px }
+.activityTrades a { color: inherit; text-decoration: none }
+.activityTrades a:hover { color: var(--text) }
 @media (max-width: 80rem) {
-  .overview { grid-template-columns: repeat(2, minmax(0, 1fr)) }
-  .agentCards { grid-template-columns: repeat(2, minmax(0, 1fr)) }
-  .activityGrid { grid-template-columns: minmax(0, 1fr) }
+  .activityLayout { gap: 32px; grid-template-columns: minmax(0, 1fr) 240px }
+}
+@media (max-width: 65rem) {
+  .activityLayout { grid-template-columns: minmax(0, 1fr); grid-template-areas: "positions" "feed" "team"; grid-template-rows: auto }
+  .activityPositions { padding-bottom: 20px; border-bottom: 1px solid var(--border) }
 }
 @media (max-width: 48rem) {
-  .activity { padding: 20px 16px }
-  .activityHead { flex-direction: column; gap: 10px }
-  .overview > div { padding: 13px }
-  .agentCard { padding: 10px }
+  .activity { padding: 24px 20px }
+  .activityHead { margin-bottom: 24px }
+  .activityHead h1 { font-size: 22px }
+  .activityBalance { gap: 22px; margin-bottom: 32px }
+  .activityBalance dt { font-size: 11px }
+  .activityBalance dd { font-size: 14px }
+  .activityTabs { gap: 20px }
+  .activityTimeline .event { gap: 10px; padding: 18px 0 }
+  .activityTimeline .eventText { font-size: 13px }
 }
 @media (max-width: 80rem) {
   .trade { grid-template-columns: 200px minmax(0, 1fr) 300px }
