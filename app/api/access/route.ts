@@ -4,7 +4,7 @@ import { access, isAdmin, planOf } from "@/lib/server/access";
 import { FEE_WALLET } from "@/lib/server/fees";
 import { fail } from "@/lib/server/http";
 import { clientIp, limited } from "@/lib/server/limit";
-import { planList } from "@/lib/server/plans";
+import { planList, WIF } from "@/lib/server/plans";
 import { currentOwner } from "@/lib/session";
 
 /** Where the signed-in owner stands (approved, waiting, turned down, not applied, or due a plan), their plan and the prices. */
@@ -14,7 +14,7 @@ export async function GET() {
   const slow = await limited(owner, "read");
   if (slow) return slow;
   const [status, plan] = await Promise.all([access(owner), planOf(owner).catch(() => null)]);
-  return Response.json({ status, admin: isAdmin(owner), plan, plans: planList(), payTo: FEE_WALLET });
+  return Response.json({ status, admin: isAdmin(owner), plan, plans: planList(), payTo: FEE_WALLET, wif: WIF });
 }
 
 /** Sends the application. */

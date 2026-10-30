@@ -6,8 +6,9 @@ import type { Fill } from "./Chart";
 
 export type { Line, Snapshot };
 export type Access = "approved" | "pending" | "rejected" | "none" | "needs_plan";
-export type Plan = { id: string; name: string; days: number; eth: string };
-export type AccessInfo = { status: Access; admin: boolean; plan: { plan: string; until: number } | null; plans: Plan[]; payTo: string };
+export type Plan = { id: string; name: string; days: number; eth: string; wif: string };
+export type Coin = "eth" | "wif";
+export type AccessInfo = { status: Access; admin: boolean; plan: { plan: string; until: number } | null; plans: Plan[]; payTo: string; wif: string };
 export type Chat = { thread: number; title: string; at: number; open: boolean };
 export type MarketToken = Partial<Candidate> & { token: string; symbol: string; group: "held" | "traded" | "market" };
 export type TokenView = {
@@ -55,7 +56,7 @@ export const api = {
   deleteStrategy: (id: string) => call(`/api/strategies/${id}`, { method: "DELETE" }),
   withdraw: (eth: string) => call<{ hash: string }>("/api/withdraw", { method: "POST", json: { eth } }),
   access: () => call<AccessInfo>("/api/access"),
-  pay: (plan: string, hash: string) => call<{ plan: string; until: number }>("/api/plan", { method: "POST", json: { plan, hash } }),
+  pay: (plan: string, hash: string, coin: Coin) => call<{ plan: string; until: number }>("/api/plan", { method: "POST", json: { plan, hash, coin } }),
   apply: (answers: Record<string, string | string[]>) => call<{ status: Access }>("/api/access", { method: "POST", json: { answers } }),
   nonce: () => call<{ nonce: string; issuedAt: string }>("/api/auth/nonce"),
   verify: (address: string, signature: string) => call<{ owner: string }>("/api/auth/verify", { method: "POST", json: { address, signature } }),

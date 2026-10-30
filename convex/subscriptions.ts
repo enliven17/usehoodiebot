@@ -17,7 +17,7 @@ export const get = query({
  * changes nothing, so a retried request or a replayed transfer never extends twice.
  */
 export const pay = mutation({
-  args: { secret, owner: v.string(), hash: v.string(), plan: v.string(), wei: v.string(), days: v.number() },
+  args: { secret, owner: v.string(), hash: v.string(), plan: v.string(), coin: v.optional(v.string()), wei: v.string(), days: v.number() },
   handler: async (ctx, { secret: s, days, ...p }) => {
     guard(s);
     const row = await ctx.db.query("subscriptions").withIndex("by_owner", (q) => q.eq("owner", p.owner)).unique();

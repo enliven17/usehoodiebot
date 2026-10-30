@@ -52,6 +52,7 @@ Checks: `npm run typecheck`, `npm test`, `npx convex dev --once` (deploys and ty
 | `PRIVY_AUTHORIZATION_KEY` | Vercel | `wallet-auth:…` P-256 key; owns every wallet and policy, required in production |
 | `ROBINHOOD_RPC` | Vercel | a provider endpoint; the public RPC is rate limited |
 | `PLAN_MONTH_ETH`, `PLAN_YEAR_ETH` | Vercel | plan prices in ETH (default 0.01 and 0.1), paid to `FEE_WALLET` |
+| `PLAN_MONTH_WIF`, `PLAN_YEAR_WIF` | Vercel | plan prices in $WIF (default 15000 and 150000); paying in $WIF skips the waitlist |
 
 ## Deploy
 

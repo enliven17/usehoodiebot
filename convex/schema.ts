@@ -110,7 +110,7 @@ export default defineSchema({
   /** The paid plan per owner: until when Hoodie is open to them. */
   subscriptions: defineTable({ owner: v.string(), plan: v.string(), until: v.number() }).index("by_owner", ["owner"]),
   /** Every plan payment, one per transaction hash, so one transfer never pays twice. */
-  payments: defineTable({ owner: v.string(), hash: v.string(), plan: v.string(), wei: v.string() }).index("by_hash", ["hash"]),
+  payments: defineTable({ owner: v.string(), hash: v.string(), plan: v.string(), coin: v.optional(v.string()), wei: v.string() }).index("by_hash", ["hash"]),
 
   /** Hoodie's commission on each fill: paid (with its transfer) or owed until the tick sends it. */
   fees: defineTable({

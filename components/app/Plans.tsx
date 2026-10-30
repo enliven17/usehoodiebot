@@ -2,12 +2,12 @@
 
 import { useModal } from "connectkit";
 import { useEffect, useState } from "react";
-import { parseEther } from "viem";
-import { useAccount, useSendTransaction, useSwitchChain } from "wagmi";
+import { erc20Abi, parseEther, parseUnits } from "viem";
+import { useAccount, useSendTransaction, useSwitchChain, useWriteContract } from "wagmi";
 
 import { robinhood } from "@/lib/chain/robinhood-chain";
 
-import { api, type AccessInfo, type Plan } from "./api";
+import { api, type AccessInfo, type Coin, type Plan } from "./api";
 import s from "./app.module.css";
 
 const PENDING = "hoodie-payment";
@@ -15,10 +15,10 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const until = (ms: number) => new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
 /** Books a sent payment, asking again while the chain has not confirmed it yet (about two minutes at most). */
-async function book(plan: string, hash: string) {
+async function book(plan: string, hash: string, coin: Coin) {
   for (let i = 0; ; i++) {
     try {
-      return await api.pay(plan, hash);
+      return await api.pay(plan, hash, coin);
     } catch (err) {
       if ((err as { status?: number }).status !== 409 || /already used/.test((err as Error).message) || i >= 40) throw err;
       await wait(3000);
@@ -27,24 +27,27 @@ async function book(plan: string, hash: string) {
 }
 
 /**
- * The plans and the pay button: ETH from the wallet the owner signed in with, straight to Hoodie on Robinhood Chain,
- * then the server checks the transfer onchain and opens the plan. A sent payment is kept in the browser until it is
- * booked, so closing the tab mid-way loses nothing.
+ * The plans and the pay button: ETH or $WIF from the wallet the owner signed in with, straight to Hoodie on Robinhood
+ * Chain, then the server checks the transfer onchain and opens the plan. `wifOnly` is the waitlist's way past it: only
+ * $WIF skips the line. A sent payment is kept in the browser until it is booked, so closing the tab mid-way loses nothing.
  */
-export function Plans({ info, onPaid }: { info: AccessInfo; onPaid: () => void }) {
+export function Plans({ info, onPaid, wifOnly }: { info: AccessInfo; onPaid: () => void; wifOnly?: boolean }) {
   const year = info.plans.find((p) => p.id === "year");
   const [pick, setPick] = useState(year?.id ?? info.plans[0]?.id ?? "month");
+  const [coin, setCoin] = useState<Coin>("wif");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { isConnected, chainId } = useAccount();
   const { setOpen } = useModal();
   const { switchChainAsync } = useSwitchChain();
   const { sendTransactionAsync } = useSendTransaction();
+  const { writeContractAsync } = useWriteContract();
+  const unit = (p: Plan, c: Coin) => (c === "wif" ? `${Number(p.wif).toLocaleString("en-US")} $WIF` : `${p.eth} ETH`);
 
-  async function settle(plan: string, hash: string) {
+  async function settle(plan: string, hash: string, paid: Coin) {
     setBusy("Confirming payment…");
     try {
-      await book(plan, hash);
+      await book(plan, hash, paid);
       localStorage.removeItem(PENDING);
       onPaid();
     } catch (err) {
@@ -59,8 +62,8 @@ export function Plans({ info, onPaid }: { info: AccessInfo; onPaid: () => void }
   // a payment sent before a reload is picked up again
   useEffect(() => {
     try {
-      const left = JSON.parse(localStorage.getItem(PENDING) ?? "null") as { plan: string; hash: string } | null;
-      if (left) void settle(left.plan, left.hash);
+      const left = JSON.parse(localStorage.getItem(PENDING) ?? "null") as { plan: string; hash: string; coin?: Coin } | null;
+      if (left) void settle(left.plan, left.hash, left.coin ?? "eth");
     } catch {
       /* nothing kept */
     }
@@ -74,13 +77,17 @@ export function Plans({ info, onPaid }: { info: AccessInfo; onPaid: () => void }
     try {
       setBusy("Confirm in your wallet…");
       if (chainId !== robinhood.id) await switchChainAsync({ chainId: robinhood.id });
-      const hash = await sendTransactionAsync({ chainId: robinhood.id, to: info.payTo as `0x${string}`, value: parseEther(plan.eth) });
+      const to = info.payTo as `0x${string}`;
+      const hash =
+        coin === "wif"
+          ? await writeContractAsync({ chainId: robinhood.id, address: info.wif as `0x${string}`, abi: erc20Abi, functionName: "transfer", args: [to, parseUnits(plan.wif, 18)] })
+          : await sendTransactionAsync({ chainId: robinhood.id, to, value: parseEther(plan.eth) });
       try {
-        localStorage.setItem(PENDING, JSON.stringify({ plan: plan.id, hash }));
+        localStorage.setItem(PENDING, JSON.stringify({ plan: plan.id, hash, coin }));
       } catch {
         /* private mode */
       }
-      await settle(plan.id, hash);
+      await settle(plan.id, hash, coin);
     } catch (err) {
       const m = (err as { shortMessage?: string; message: string }).shortMessage ?? (err as Error).message;
       setError(/reject|denied/i.test(m) ? "Payment cancelled." : m);
@@ -89,9 +96,19 @@ export function Plans({ info, onPaid }: { info: AccessInfo; onPaid: () => void }
   }
 
   const month = info.plans.find((p) => p.id === "month");
-  const save = month && year ? Math.round((1 - Number(year.eth) / (Number(month.eth) * 12)) * 100) : 0;
+  const save = month && year ? Math.round((1 - Number(year[coin]) / (Number(month[coin]) * 12)) * 100) : 0;
+  const picked = info.plans.find((p) => p.id === pick);
   return (
     <div className={s.plans}>
+      {wifOnly ? null : (
+        <div className={s.coins} role="radiogroup" aria-label="Pay with">
+          {(["wif", "eth"] as const).map((c) => (
+            <button key={c} type="button" role="radio" aria-checked={coin === c} className={s.option} disabled={!!busy} onClick={() => setCoin(c)}>
+              {c === "wif" ? "$WIF · costs less" : "ETH"}
+            </button>
+          ))}
+        </div>
+      )}
       <div className={s.options} role="radiogroup" aria-label="Plan">
         {info.plans.map((p: Plan) => (
           <button key={p.id} type="button" role="radio" aria-checked={pick === p.id} className={s.option} disabled={!!busy} onClick={() => setPick(p.id)}>
@@ -99,12 +116,12 @@ export function Plans({ info, onPaid }: { info: AccessInfo; onPaid: () => void }
               {p.name}
               {p.id === "year" && save > 0 ? <span className="faint"> · save {save}%</span> : null}
             </span>
-            <span className="num">{p.eth} ETH</span>
+            <span className="num">{unit(p, wifOnly ? "wif" : coin)}</span>
           </button>
         ))}
       </div>
       <button type="button" className="btn btn-primary" onClick={pay} disabled={!!busy}>
-        {busy ?? (isConnected ? `Pay ${info.plans.find((p) => p.id === pick)?.eth} ETH` : "Connect wallet to pay")}
+        {busy ?? (isConnected ? (picked ? `Pay ${unit(picked, coin)}` : "Pay") : "Connect wallet to pay")}
       </button>
       <p className={s.error} role="alert">{error}</p>
       {info.plan ? <p className="faint">Your plan runs until {until(info.plan.until)}. Paying again adds to it.</p> : null}

@@ -23,7 +23,8 @@ const load = (): Answers => {
 
 /**
  * The way in: one question per screen, a draft kept in the browser, then a last look before sending. After sending, the
- * owner is on the waitlist; once an admin approves them they pick a plan, and the app opens when it is paid.
+ * owner is on the waitlist; once an admin approves them they pick a plan, and the app opens when it is paid. Paying in
+ * $WIF skips the line: no application, no wait.
  */
 export function Apply({ status, info, onSent, onPaid, onSignOut }: { status: "none" | "pending" | "rejected" | "needs_plan"; info: AccessInfo | null; onSent: () => void; onPaid: () => void; onSignOut: () => void }) {
   const [at, setAt] = useState(0);
@@ -31,6 +32,7 @@ export function Apply({ status, info, onSent, onPaid, onSignOut }: { status: "no
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [dir, setDir] = useState(1);
+  const [skip, setSkip] = useState(false);
   const reduce = useReducedMotion();
   const input = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
   const submit = useRef<HTMLButtonElement>(null);
@@ -54,8 +56,21 @@ export function Apply({ status, info, onSent, onPaid, onSignOut }: { status: "no
       <div className={s.signin}>
         <Hoodie size={120} mood="happy" />
         <h1 className={s.signinTitle}>{info.plan ? "Your plan has ended" : "You are in. Pick a plan"}</h1>
-        <p className={s.signinText}>Paid in ETH on Robinhood Chain, from the wallet you signed in with. Your team opens the moment the payment confirms.</p>
+        <p className={s.signinText}>Paid in $WIF or ETH on Robinhood Chain, from the wallet you signed in with. Your team opens the moment the payment confirms.</p>
         <Plans info={info} onPaid={onPaid} />
+        <button type="button" className={s.linkish} onClick={onSignOut}>Sign out</button>
+      </div>
+    );
+  }
+
+  if (skip && info) {
+    return (
+      <div className={s.signin}>
+        <Hoodie size={120} mood="happy" />
+        <h1 className={s.signinTitle}>Skip the line with $WIF</h1>
+        <p className={s.signinText}>No application, no wait. Pay for a plan in $WIF on Robinhood Chain from the wallet you signed in with, and your team opens the moment it confirms.</p>
+        <Plans info={info} onPaid={onPaid} wifOnly />
+        {status === "none" ? <button type="button" className={s.linkish} onClick={() => setSkip(false)}>Apply instead</button> : null}
         <button type="button" className={s.linkish} onClick={onSignOut}>Sign out</button>
       </div>
     );
@@ -71,6 +86,7 @@ export function Apply({ status, info, onSent, onPaid, onSignOut }: { status: "no
             ? "Thanks, your application is in. We let people in a few at a time and read every one. Hoodie opens here by itself the moment you are approved."
             : "Your application was not approved for now. We open more places as Hoodie grows; keep an eye on our X."}
         </p>
+        {info ? <button type="button" className="btn btn-primary" onClick={() => setSkip(true)}>Skip the line with $WIF</button> : null}
         <button type="button" className={s.linkish} onClick={onSignOut}>Sign out</button>
       </div>
     );
@@ -121,7 +137,10 @@ export function Apply({ status, info, onSent, onPaid, onSignOut }: { status: "no
     >
       <div className={s.applyTop}>
         <span className="num faint">{answered} of {total} answered</span>
-        <button type="button" className={s.linkish} onClick={onSignOut}>Sign out</button>
+        <span>
+          {info ? <button type="button" className={s.linkish} onClick={() => setSkip(true)}>Skip the line with $WIF</button> : null}
+          <button type="button" className={s.linkish} onClick={onSignOut}>Sign out</button>
+        </span>
       </div>
       <div className={s.progress} aria-hidden><span style={{ width: `${(at / QUESTIONS.length) * 100}%` }} /></div>
 

@@ -23,8 +23,8 @@ export default function Terms() {
       <h2>Fees and access</h2>
       <p>
         Hoodie takes 0.5% of the ETH in every buy and every sell your team makes, by hand, by approval or automatically, sent from the
-        team wallet right after the trade. The order ticket shows it before you trade. Network fees are on top. Access is by
-        application, then a monthly or yearly plan paid in ETH from the wallet you sign in with. Plans are not refunded and do not renew
+        team wallet right after the trade. The order ticket shows it before you trade. Network fees are on top. Access is
+        a monthly or yearly plan paid from the wallet you sign in with: in $WIF, or in ETH after an approved application. Plans are not refunded and do not renew
         by themselves. Fees and prices can change; the app always shows the current ones.
       </p>
       <h2>No advice, no guarantees</h2>

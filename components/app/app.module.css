@@ -452,3 +452,5 @@
 .plans .option { justify-content: space-between }
 .plans > p.faint { margin: 0; font-size: 13px; text-align: center }
 .planName { color: var(--text) }
+.coins { display: grid; grid-template-columns: 1fr 1fr; gap: 8px }
+.coins .option { justify-content: center }

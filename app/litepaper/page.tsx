@@ -76,8 +76,9 @@ export default function Litepaper() {
 
       <h2>Plans</h2>
       <p>
-        Hoodie is paid for with a plan, monthly or yearly, in ETH on Robinhood Chain from the wallet you sign in with. There is no
-        Hoodie token: anything claiming to be one is not ours.
+        Hoodie is paid for with a plan, monthly or yearly, on Robinhood Chain from the wallet you sign in with. Pay in $WIF (World
+        is Flat) and it costs less and skips the waitlist: no application, no one deciding whether you are allowed in. ETH works too,
+        once your application is approved. There is no Hoodie token: anything claiming to be one is not ours.
       </p>
 
       <h2>Risks</h2>

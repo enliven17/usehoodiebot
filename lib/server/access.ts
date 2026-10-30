@@ -19,12 +19,13 @@ export type Access = "approved" | "pending" | "rejected" | "none" | "needs_plan"
 export const planOf = (owner: string) => query(api.subscriptions.get, { owner });
 
 /**
- * Whether an owner is in: an approved application (admins always are), then a plan that has not run out.
- * OPEN_ACCESS=1 skips both (local development and e2e runs only).
+ * Whether an owner is in: a plan that has not run out (admins always are). A plan is bought in ETH after an approved
+ * application, or in $WIF without one, so a running plan is enough. OPEN_ACCESS=1 skips it (local development and e2e).
  */
 export async function access(owner: string): Promise<Access> {
   if (isAdmin(owner) || process.env.OPEN_ACCESS === "1") return "approved";
-  const status = (await query(api.applications.get, { owner }))?.status ?? "none";
-  if (status !== "approved") return status;
-  return ((await planOf(owner))?.until ?? 0) > Date.now() ? "approved" : "needs_plan";
+  const [plan, app] = await Promise.all([planOf(owner), query(api.applications.get, { owner })]);
+  if ((plan?.until ?? 0) > Date.now()) return "approved";
+  const status = app?.status ?? "none";
+  return status === "approved" ? "needs_plan" : status;
 }
