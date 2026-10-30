@@ -9,6 +9,7 @@
  * curvePct is real ETH raised over the 4.2 ETH graduation threshold, from reserve_in_usd and the ETH price GT reports.
  */
 import { getAddress, isAddress } from "viem";
+import { GeckoClient } from "./gecko";
 
 const GT = "https://api.geckoterminal.com/api/v2/networks/robinhood";
 /** Phantom quote (1.68 ETH) plus the 4.2 ETH threshold: a curve's quote reserve when it graduates. */
@@ -89,63 +90,36 @@ export function toCandidate(p: Pool, venue: Venue, now: number): Candidate | nul
   };
 }
 
-/**
- * GeckoTerminal answers 429 after a few calls a minute from one address. Each answer is kept, and a refused call falls
- * back to the last good answer, so a busy minute shows slightly old data instead of nothing.
- * ponytail: per-instance memory cache; a shared cache (KV) only if serverless cold starts start hitting the rate limit.
- */
-const cache = new Map<string, { at: number; data: Promise<unknown>; good?: unknown }>();
-/** One GeckoTerminal GET; a 429 is tried once more after a short wait (its limit is per minute and refills). */
-async function fetchGt(url: string, retry = true): Promise<Response> {
-  const r = await fetch(url, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(15_000) });
-  if (r.status === 429 && retry) {
-    await new Promise((ok) => setTimeout(ok, 1500));
-    return fetchGt(url, false);
-  }
-  return r;
-}
-
-export function gt<T>(url: string, ttl = TTL_MS): Promise<T> {
-  const hit = cache.get(url);
-  if (hit && Date.now() - hit.at < ttl) return hit.data as Promise<T>;
-  const data = fetchGt(url)
-    .then(async (r) => {
-      if (!r.ok) throw new Error(`geckoterminal ${r.status}`);
-      const json = (await r.json()) as T;
-      cache.set(url, { at: Date.now(), data: Promise.resolve(json), good: json });
-      return json;
-    })
-    .catch((err) => {
-      const good = cache.get(url)?.good;
-      if (good !== undefined) {
-        cache.set(url, { at: Date.now() - ttl + 10_000, data: Promise.resolve(good), good }); // try again in 10 s
-        return good as T;
-      }
-      cache.delete(url);
-      throw err;
-    });
-  cache.set(url, { at: Date.now(), data, good: hit?.good });
-  // at most 500 answers kept: the oldest go first (a Map keeps insertion order)
-  while (cache.size > 500) cache.delete(cache.keys().next().value!);
-  return data;
-}
+const gecko = new GeckoClient();
+/** All agents share request pacing, cooldowns, in-flight reads and a bounded stale fallback. */
+export const gt = <T>(url: string, ttl = TTL_MS, maxAge?: number): Promise<T> => gecko.get<T>(url, ttl, maxAge);
 const pools = (url: string) => gt<{ data?: Pool[] }>(url).then((j) => j.data ?? []);
 
 /** Fresh launches and the busiest curve tokens, then the busiest graduated ones. Deduplicated by token. */
-export async function candidates(): Promise<Candidate[]> {
+export async function candidatePage(page = 1): Promise<{ tokens: Candidate[]; incomplete: boolean; hasMore: boolean }> {
   const now = Date.now();
-  const [newest, curve, graduated] = await Promise.all([
-    pools(`${GT}/new_pools?page=1`).catch(() => [] as Pool[]),
-    pools(`${GT}/dexes/pons-v2/pools?page=1&sort=h24_volume_usd_desc`).catch(() => [] as Pool[]),
-    pools(`${GT}/dexes/pons-v2-dex/pools?page=1&sort=h24_volume_usd_desc`).catch(() => [] as Pool[]),
+  const results = await Promise.allSettled([
+    pools(`${GT}/new_pools?page=${page}`),
+    pools(`${GT}/dexes/pons-v2/pools?page=${page}&sort=h24_volume_usd_desc`),
+    pools(`${GT}/dexes/pons-v2-dex/pools?page=${page}&sort=h24_volume_usd_desc`),
   ]);
+  if (results.every((r) => r.status === "rejected")) throw new Error("Market data is temporarily unavailable");
+  const [newest = [], curve = [], graduated = []] = results.map((r) => r.status === "fulfilled" ? r.value : []);
   const fresh = newest.filter((p) => p.relationships?.dex?.data?.id === "pons-v2");
   const all = [
     ...[...fresh, ...curve].map((p) => toCandidate(p, "curve", now)),
     ...graduated.map((p) => toCandidate(p, "graduated", now)),
   ].filter((c): c is Candidate => c !== null);
   const seen = new Set<string>();
-  return all.filter((c) => !seen.has(c.token) && seen.add(c.token));
+  return {
+    tokens: all.filter((c) => !seen.has(c.token) && seen.add(c.token)),
+    incomplete: results.some((r) => r.status === "rejected"),
+    hasMore: page < 10 && [newest, curve, graduated].some((list) => list.length > 0),
+  };
+}
+
+export async function candidates(): Promise<Candidate[]> {
+  return (await candidatePage()).tokens;
 }
 
 /** Candle sizes the chart offers, as GeckoTerminal's timeframe and aggregate. */
@@ -155,8 +129,8 @@ export type Candle = { time: number; open: number; high: number; low: number; cl
 
 /** A token's busiest pool (curve or graduated) with its market numbers. */
 export async function tokenMarket(token: string): Promise<(Candidate & { pool: string }) | null> {
-  // a token's pool only changes when it graduates: an hour is fresh enough for the lookup
-  const list = (await gt<{ data?: Pool[] }>(`${GT}/tokens/${token.toLowerCase()}/pools?page=1`, 60 * 60_000)).data ?? [];
+  // Graduation can change the pool at any moment; refresh alongside the market list.
+  const list = (await gt<{ data?: Pool[] }>(`${GT}/tokens/${token.toLowerCase()}/pools?page=1`, 60_000)).data ?? [];
   const p = list.find((x) => x.relationships?.dex?.data?.id?.startsWith("pons-v2")) ?? list[0];
   const pool = p?.attributes?.address;
   if (!p || !pool) return null;
@@ -171,7 +145,8 @@ export async function candles(pool: string, tf: Timeframe): Promise<Candle[]> {
   return (j.data?.attributes?.ohlcv_list ?? [])
     .map(([time, open, high, low, close, volume]) => ({ time: time!, open: open!, high: high!, low: low!, close: close!, volume: volume ?? 0 }))
     .filter((c) => [c.time, c.open, c.high, c.low, c.close].every(Number.isFinite))
-    .reverse();
+    .sort((a, b) => a.time - b.time)
+    .filter((c, i, all) => i === 0 || c.time !== all[i - 1]!.time);
 }
 
 /** Pons tokens priced in ETH whose name or symbol matches `q`, busiest pool first, one row per token. */

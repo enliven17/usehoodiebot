@@ -39,7 +39,7 @@ export const api = {
   send: (text: string) => call<{ lines: Line[] }>("/api/chat", { method: "POST", json: { text } }),
   chats: () => call<{ threads: Chat[] }>("/api/chat/threads"),
   openChat: (thread: number) => call<{ lines: Line[] }>("/api/chat/open", { method: "POST", json: { thread } }),
-  market: () => call<{ tokens: MarketToken[] }>("/api/market"),
+  market: (q = "", page = 1) => call<{ tokens: MarketToken[]; hasMore: boolean; unavailable?: boolean }>(`/api/market?${new URLSearchParams({ q, page: String(page) })}`),
   token: (token: string) => call<TokenView>(`/api/market/${token}`),
   quote: (q: { token: string; side: "buy" | "sell"; eth?: string; pct?: number }) => call<Quote>(`/api/quote?${new URLSearchParams(Object.entries(q).map(([k, v]) => [k, String(v)]))}`),
   trade: (t: { side: "buy" | "sell"; token: string; symbol: string; slippageBps: number; eth?: string; pct?: number; cardId?: string } & Exits) => call<{ hash: string; pending?: boolean }>("/api/trade", { method: "POST", json: t }),

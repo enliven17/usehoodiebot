@@ -94,20 +94,26 @@ export function assess(info: TokenInfo, trades: Trade[]): Shield {
 
 const GT = "https://api.geckoterminal.com/api/v2/networks/robinhood";
 const TTL_MS = 3 * 60_000;
-const memo = new Map<string, { at: number; data: Promise<Shield> }>();
 
 type RawTrade = { attributes?: { kind?: string; tx_from_address?: string; from_token_amount?: string; to_token_amount?: string; block_timestamp?: string } };
-// the shared GeckoTerminal fetch: cached, retried on a 429, and falling back to the last good answer
-const get = <T>(url: string) => gt<T>(url, TTL_MS);
+// Safety checks never fall back to a read older than the assessment's freshness window.
+const get = <T>(url: string) => gt<T>(url, TTL_MS, TTL_MS);
 
 /** ShieldBot's read on a token, from GeckoTerminal; cached a few minutes per token. */
 export function shield(token: string, pool: string | undefined): Promise<Shield> {
-  const key = token.toLowerCase();
-  const hit = memo.get(key);
-  if (hit && Date.now() - hit.at < TTL_MS) return hit.data;
-  const data = Promise.all([
-    get<{ data?: { attributes?: TokenInfo } }>(`${GT}/tokens/${key}/info`).then((j) => j.data?.attributes ?? {}),
-    pool ? get<{ data?: RawTrade[] }>(`${GT}/pools/${pool.toLowerCase()}/trades`).then((j) => j.data ?? []).catch(() => [] as RawTrade[]) : Promise.resolve([] as RawTrade[]),
+  if (!pool) return Promise.reject(new Error("ShieldBot: no pool available to check recent trades"));
+  const address = token.toLowerCase();
+  // The upstream cache already shares in-flight requests. A second assessment cache could
+  // extend an old safety read beyond its three-minute freshness window.
+  return Promise.all([
+    get<{ data?: { attributes?: TokenInfo } }>(`${GT}/tokens/${address}/info`).then((j) => {
+      if (!j.data?.attributes || !Object.keys(j.data.attributes).length) throw new Error("ShieldBot: token safety data unavailable");
+      return j.data.attributes;
+    }),
+    get<{ data?: RawTrade[] }>(`${GT}/pools/${pool.toLowerCase()}/trades`).then((j) => {
+      if (!Array.isArray(j.data)) throw new Error("ShieldBot: recent trades unavailable");
+      return j.data;
+    }),
   ]).then(([info, raw]) =>
     assess(
       info,
@@ -118,9 +124,6 @@ export function shield(token: string, pool: string | undefined): Promise<Shield>
       }),
     ),
   );
-  data.catch(() => memo.delete(key));
-  memo.set(key, { at: Date.now(), data });
-  return data;
 }
 
 /** One line for the timeline and the model. */

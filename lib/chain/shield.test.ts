@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { assess, type Trade } from "./shield";
+import { assess, shield, type Trade } from "./shield";
+
+test("ShieldBot never scores a token without a pool or with missing trade data", async (t) => {
+  await assert.rejects(shield("missing-pool", undefined), /no pool/);
+  t.mock.method(globalThis, "fetch", async (url: string) => Response.json(url.endsWith("/info") ? { data: { attributes: { holders: { count: 300 }, twitter_handle: "pons" } } } : {}));
+  await assert.rejects(shield("missing-trades", "pool"), /recent trades unavailable/);
+});
 
 const buy = (from: string, eth: number): Trade => ({ kind: "buy", from, eth, tokens: eth * 1e6, at: 0 });
 const healthy = Array.from({ length: 12 }, (_, i) => buy(`0x${i}`, 0.01 + i * 0.003));

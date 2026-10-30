@@ -1,7 +1,7 @@
 /* shell: rail | chat | side, like Kurage's dashboard */
 .shell { position: relative; display: grid; grid-template-columns: var(--rail-w) minmax(0, 1fr) 380px; height: 100dvh; transition: grid-template-columns .45s var(--ease) }
 .shell[data-side="closed"] { grid-template-columns: var(--rail-w) minmax(0, 1fr) 0px }
-.shell[data-side="closed"] .side { opacity: 0; pointer-events: none; overflow: hidden; border-left-color: transparent }
+.shell[data-side="closed"] .side { opacity: 0; pointer-events: none; overflow: hidden; padding-inline: 0; border-left-width: 0 }
 .railBtn[aria-pressed="true"] { color: var(--text) }
 .solo { position: relative; z-index: 1; display: grid; place-items: center; min-height: 100dvh; padding: 24px 16px }
 
@@ -204,6 +204,46 @@
 .why time { flex: none; font-size: 11.5px }
 
 .deskGrid { grid-template-columns: minmax(0, 1fr) }
+.marketFilters { display: flex; flex-wrap: wrap; gap: 5px; padding: 4px 0 8px }
+.marketFilters button { padding: 7px 10px; border-radius: 8px; font-size: 12px; color: var(--text-muted); transition: background .15s, color .15s }
+.marketFilters button:hover, .marketFilters button[aria-pressed="true"] { background: var(--surface-active); color: var(--text) }
+.marketStatus { margin: 0 0 10px; font-size: 12px; line-height: 1.6; color: var(--text-muted) }
+.loadMore { flex: none; margin: 6px 0 12px; width: 100% }
+.dataNotice { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--text-muted); font-size: 12px }
+.main[data-view="activity"] { background: rgba(4, 6, 10, .94) }
+.main[data-view="activity"] > .thread, .main[data-view="activity"] > .composer { display: none }
+.activity { flex: 1; min-height: 0; overflow-y: auto; padding: 28px clamp(16px, 3vw, 40px); scrollbar-width: thin }
+.activityHead { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 24px }
+.activityHead h1 { margin: 8px 0; font-size: clamp(24px, 3vw, 36px); font-weight: 400; letter-spacing: -.035em }
+.activityHead p { margin: 0; line-height: 1.6; font-size: 14px }
+.activityHead .eyebrow { font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: var(--cyan-200) }
+.liveStatus { flex: none; padding: 7px 10px; border: 1px solid var(--border); border-radius: 20px; font-size: 11px; color: var(--text-muted) }
+.overview { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0 0 20px }
+.overview > div { padding: 18px; border: 1px solid var(--border); border-radius: 14px; background: rgba(255,255,255,.025) }
+.overview dt { font-size: 12px; color: var(--text-muted) }
+.overview dd { margin: 10px 0 0; font-size: clamp(16px, 1.8vw, 23px); overflow-wrap: anywhere }
+.agentCards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 22px }
+.agentCard { padding: 14px; border: 1px solid var(--border); border-top: 2px solid var(--eye); border-radius: 12px; background: rgba(255,255,255,.02) }
+.agentCard > div { display: flex; align-items: center; gap: 8px }
+.agentCard strong { font-size: 13px; font-weight: 500 }
+.agentCard p { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; font-size: 12px; line-height: 1.6; color: var(--text-muted); min-height: 38px }
+.agentCard time { font-size: 11px }
+.activityGrid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 28px }
+.activityFeed > .block { padding-top: 8px }
+.activityTrade { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 8px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 12px }
+.activityTrade strong { font-weight: 500; overflow: hidden; text-overflow: ellipsis }
+.activityTrade > :last-child { grid-column: 2 / -1; font-size: 11px; color: var(--text-muted) }
+@media (max-width: 80rem) {
+  .overview { grid-template-columns: repeat(2, minmax(0, 1fr)) }
+  .agentCards { grid-template-columns: repeat(2, minmax(0, 1fr)) }
+  .activityGrid { grid-template-columns: minmax(0, 1fr) }
+}
+@media (max-width: 48rem) {
+  .activity { padding: 20px 16px }
+  .activityHead { flex-direction: column; gap: 10px }
+  .overview > div { padding: 13px }
+  .agentCard { padding: 10px }
+}
 @media (max-width: 80rem) {
   .trade { grid-template-columns: 200px minmax(0, 1fr) 300px }
 }
@@ -221,7 +261,7 @@
   .shell, .shell[data-side="closed"] { grid-template-columns: var(--rail-w) minmax(0, 1fr) }
   .side { display: none }
   .shell[data-panel="team"] .main { display: none }
-  .shell[data-panel="team"] .side { display: block; border-left: 0; opacity: 1; pointer-events: auto; overflow-y: auto }
+  .shell[data-panel="team"] .side { display: block; padding-inline: 18px; border-left: 0; opacity: 1; pointer-events: auto; overflow-y: auto }
 }
 /* phone chrome: a top bar and a labelled tab bar, hidden on wider screens */
 .topbar, .railLabel, .tradeBar, .scrim, .grabber { display: none }
@@ -285,6 +325,7 @@
 .code { padding: 1px 5px; border-radius: 6px; background: rgba(255, 255, 255, .06); font-family: var(--font-mono); font-size: .88em; color: var(--text) }
 .stepChip { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap }
 .stepChip::before { content: ""; width: 3px; height: 10px; border-radius: 2px; background: var(--eye) }
+.stepChip[data-failed] { color: var(--red-300) }
 
 /* decisions */
 .timeline { position: relative; margin: 0; padding: 0; list-style: none }

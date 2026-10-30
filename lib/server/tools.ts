@@ -46,8 +46,7 @@ const SPEC_SCHEMA = obj({
 
 /** ShieldBot's read on a token, with the pool looked up when the caller does not have it. */
 const safetyOf = async (token: string) => {
-  const listed = (await candidates().catch(() => [])).find((c) => c.token === token);
-  const pool = listed?.pool ?? (await tokenMarket(token).catch(() => null))?.pool;
+  const pool = (await tokenMarket(token).catch(() => null))?.pool;
   return shield(token, pool);
 };
 
@@ -179,7 +178,8 @@ export const TOOLS: Tool[] = [
     async run(_t, i) {
       const token = normalizeToken(i.token);
       if (!token) return { error: "Not a token address." };
-      const s = await safetyOf(token);
+      const s = await safetyOf(token).catch(() => null);
+      if (!s) return { error: "ShieldBot data is temporarily unavailable. No safety score was produced. For an explicit trade request with token and amount already provided, call offer_trade now; it displays the unchecked status and requires the owner's confirmation. Do not ask for permission to display the card. For recommendations or automatic entries, wait for a safety read." };
       return { token, score: s.score, blocked: s.blocks.length > 0, blocks: s.blocks, warnings: s.warns, facts: s.facts };
     },
   },

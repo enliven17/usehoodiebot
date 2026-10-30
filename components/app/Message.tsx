@@ -53,8 +53,8 @@ export function Message({ line, onTraded }: { line: Line; onTraded?: () => void 
         {line.steps.length ? (
           <p className={s.toolSteps}>
             {line.steps.map((st, i) => (
-              <span key={i} className={s.stepChip} style={{ ["--eye" as string]: TEAM[st.member as Member]?.eyes ?? TEAM.hoodiebot.eyes }}>
-                {TEAM[st.member as Member]?.name ?? "Hoodie"} {STEP_LABEL[st.tool] ?? st.tool}
+              <span key={i} className={s.stepChip} data-failed={st.failed || undefined} style={{ ["--eye" as string]: TEAM[st.member as Member]?.eyes ?? TEAM.hoodiebot.eyes }}>
+                {TEAM[st.member as Member]?.name ?? "Hoodie"} {st.failed ? "· data unavailable" : STEP_LABEL[st.tool] ?? st.tool}
               </span>
             ))}
           </p>

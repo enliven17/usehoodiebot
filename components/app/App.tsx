@@ -12,6 +12,7 @@ import { ShimmeringText } from "@/components/ui/ShimmeringText";
 
 import { api, type Access, type AccessInfo, type Line, type Snapshot } from "./api";
 import { Agents } from "./Agents";
+import { Activity, type TokenPick } from "./Activity";
 import { Apply } from "./Apply";
 import s from "./app.module.css";
 import { History } from "./History";
@@ -33,8 +34,8 @@ const STARTERS = [
   ["launch", "What do I need to launch a token on Pons?"],
 ] as const;
 
-type Panel = "chat" | "history" | "agents" | "trade" | "team";
-const TITLES: Record<Panel, string> = { chat: "Chat", history: "Chats", agents: "Team", trade: "Trade", team: "Wallet" };
+type Panel = "activity" | "chat" | "history" | "agents" | "trade" | "team";
+const TITLES: Record<Panel, string> = { activity: "Activity", chat: "Chat", history: "Chats", agents: "Team", trade: "Trade", team: "Wallet" };
 
 export function App({ signedIn }: { signedIn: boolean }) {
   const params = useSearchParams();
@@ -51,6 +52,8 @@ export function App({ signedIn }: { signedIn: boolean }) {
   const [panel, setPanel] = useState<Panel>("chat");
   // the team wallet panel, open or shut per view: open beside the chat, shut beside the trade ticket until asked for
   const [sideOpen, setSideOpen] = useState({ chat: true, trade: false });
+  const [tradePick, setTradePick] = useState<TokenPick | null>(null);
+  const openChart = (pick: TokenPick) => { setTradePick(pick); setPanel("trade"); };
   const bottom = useRef<HTMLDivElement>(null);
   const seeded = useRef(false);
 
@@ -94,8 +97,9 @@ export function App({ signedIn }: { signedIn: boolean }) {
   }, [authed, gate, refresh]);
 
   useEffect(() => {
+    if (panel !== "chat") return;
     void bottom.current?.scrollIntoView({ block: "end", behavior: "smooth" });
-  }, [lines, thinking]);
+  }, [lines, thinking, panel]);
 
   const send = useCallback(async (q: string) => {
     const msg = q.trim();
@@ -159,7 +163,7 @@ export function App({ signedIn }: { signedIn: boolean }) {
 
   return (
     <motion.div className={s.shell} data-panel={panel} data-side={sideOpen[sideKey] ? "open" : "closed"} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5, ease: EASE }}>
-      <Field targetId="composer" />
+      {panel === "chat" ? <Field targetId="composer" /> : null}
       <header className={s.topbar}>
         <Link href="/" aria-label="HOODIEBOT home"><Mark size={22} /></Link>
         <strong>{TITLES[panel]}</strong>
@@ -182,6 +186,10 @@ export function App({ signedIn }: { signedIn: boolean }) {
         <button type="button" className={s.railBtn} aria-current={panel === "chat" ? "page" : undefined} onClick={() => setPanel("chat")} aria-label="Chat">
           <svg className="i" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
           <span className={s.railLabel}>Chat</span>
+        </button>
+        <button type="button" className={s.railBtn} aria-current={panel === "activity" ? "page" : undefined} onClick={() => setPanel("activity")} aria-label="Activity">
+          <svg className="i" viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4" /></svg>
+          <span className={s.railLabel}>Activity</span>
         </button>
         <button type="button" className={s.railBtn} aria-current={panel === "history" ? "page" : undefined} onClick={() => setPanel("history")} aria-label="Past chats">
           <svg className="i" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /><path d="M12 7v5l4 2" /></svg>
@@ -210,8 +218,9 @@ export function App({ signedIn }: { signedIn: boolean }) {
         </button>
       </nav>
 
-      <main className={s.main} data-view={panel === "trade" || panel === "history" || panel === "agents" ? panel : "chat"}>
-        {panel === "trade" && snap ? <Trade snap={snap} onChange={refresh} /> : null}
+      <main className={s.main} data-view={panel === "activity" || panel === "trade" || panel === "history" || panel === "agents" ? panel : "chat"}>
+        {panel === "trade" && snap ? <Trade key={tradePick?.token ?? "market"} snap={snap} onChange={refresh} initialPick={tradePick} /> : null}
+        {panel === "activity" && snap ? <Activity snap={snap} onChange={refresh} onOpen={openChart} /> : null}
         {panel === "agents" && snap ? <Agents snap={snap} onChange={refresh} /> : null}
         {panel === "history" ? (
           <History
@@ -282,11 +291,11 @@ export function App({ signedIn }: { signedIn: boolean }) {
         <AnimatePresence mode="wait" initial={false}>
           {snap ? (
             <motion.div key="panels" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: EASE }}>
-              <Approvals snap={snap} onChange={refresh} />
+              {panel !== "activity" ? <Approvals snap={snap} onChange={refresh} /> : null}
               <Wallet snap={snap} onChange={refresh} />
               {info ? <PlanBlock info={info} onPaid={reask} /> : null}
-              <Timeline snap={snap} />
-              <Positions snap={snap} />
+              {panel !== "activity" ? <Timeline snap={snap} onOpen={openChart} /> : null}
+              {panel !== "activity" ? <Positions snap={snap} onOpen={openChart} /> : null}
               <Strategies snap={snap} onChange={refresh} />
             </motion.div>
           ) : (

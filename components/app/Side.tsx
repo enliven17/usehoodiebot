@@ -176,7 +176,7 @@ function Mode({ snap, onChange }: { snap: Snapshot; onChange: () => void }) {
   );
 }
 
-export function Positions({ snap }: { snap: Snapshot }) {
+export function Positions({ snap, onOpen }: { snap: Snapshot; onOpen?: (pick: { token: string; symbol: string }) => void }) {
   if (!snap.positions.length) return null;
   return (
     <section className={s.block} aria-labelledby="pos-h">
@@ -186,7 +186,7 @@ export function Positions({ snap }: { snap: Snapshot }) {
           const pnl = p.valueEth === null ? null : (p.valueEth / p.costEth - 1) * 100;
           return (
             <li key={p.id} className={s.item}>
-              <a href={addressUrl(p.token)} target="_blank" rel="noopener">{p.symbol}</a>
+              {onOpen ? <button type="button" className={s.linkish} onClick={() => onOpen({ token: p.token, symbol: p.symbol })}>{p.symbol} →</button> : <a href={addressUrl(p.token)} target="_blank" rel="noopener">{p.symbol}</a>}
               <span className="num faint">{eth(p.costEth)}</span>
               <span className={`num ${pnl === null ? "faint" : pnl >= 0 ? "up" : "down"}`}>{pnl === null ? "–" : `${pnl >= 0 ? "+" : ""}${pnl.toFixed(1)}%`}</span>
             </li>

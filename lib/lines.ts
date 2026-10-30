@@ -25,7 +25,7 @@ export type TradeCard = {
   done?: string;
 };
 
-export type Line = { id: string; who: "me" | "bot"; text: string; steps: Array<{ member: string; tool: string }>; cards?: TradeCard[] };
+export type Line = { id: string; who: "me" | "bot"; text: string; steps: Array<{ member: string; tool: string; failed?: boolean }>; cards?: TradeCard[] };
 
 /** The tool that lays out a chat trade; its result carries the card. */
 export const CARD_TOOL = "offer_trade";
@@ -37,6 +37,7 @@ export const CARD_TOOL = "offer_trade";
 export function toLines(rows: StoredRow[], memberOf: Record<string, string>, done: Record<string, string> = {}): Line[] {
   const out: Line[] = [];
   const toolOf = new Map<string, string>();
+  const stepOf = new Map<string, Line["steps"][number]>();
   for (const r of rows) {
     const m = (r.content ?? {}) as Message;
     const text = (typeof m.content === "string" ? m.content : "").trim();
@@ -45,6 +46,8 @@ export function toLines(rows: StoredRow[], memberOf: Record<string, string>, don
       continue;
     }
     if (m.role === "tool") {
+      const step = stepOf.get(m.tool_call_id ?? "");
+      if (step && (/^(Error:|Failed:)/i.test(text) || /^\s*\{\s*"error"\s*:/.test(text))) step.failed = true;
       const last = out[out.length - 1];
       if (toolOf.get(m.tool_call_id ?? "") !== CARD_TOOL || last?.who !== "bot") continue;
       try {
@@ -58,6 +61,7 @@ export function toLines(rows: StoredRow[], memberOf: Record<string, string>, don
     if (m.role !== "assistant") continue;
     for (const c of m.tool_calls ?? []) if (c.id) toolOf.set(c.id, c.function?.name ?? "");
     const steps = (m.tool_calls ?? []).map((c) => ({ tool: c.function?.name ?? "", member: memberOf[c.function?.name ?? ""] ?? "hoodiebot" }));
+    (m.tool_calls ?? []).forEach((c, i) => { if (c.id) stepOf.set(c.id, steps[i]!); });
     const last = out[out.length - 1];
     // consecutive assistant turns of one reply read as one message
     if (last?.who === "bot") {

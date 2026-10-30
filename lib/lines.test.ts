@@ -3,6 +3,15 @@ import { test } from "node:test";
 
 import { toLines, type StoredRow } from "./lines";
 
+test("toLines: an unavailable safety read is marked failed, not checked", () => {
+  const lines = toLines([
+    { id: "1", role: "assistant", content: { role: "assistant", tool_calls: [{ id: "s", function: { name: "check_safety" } }] } },
+    { id: "2", role: "tool", content: { role: "tool", tool_call_id: "s", content: "Error: ShieldBot data is temporarily unavailable" } },
+    { id: "3", role: "assistant", content: { role: "assistant", content: "This token is unchecked." } },
+  ], { check_safety: "shield" });
+  assert.equal(lines[0]?.steps[0]?.failed, true);
+});
+
 test("toLines: one reply across tool turns reads as one message; tool results stay hidden", () => {
   const lines = toLines(
     [

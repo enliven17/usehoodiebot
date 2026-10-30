@@ -18,7 +18,7 @@ const ethOf = (wei: string) => {
  * What the team decided and did, newest first: each specialist in its own colour, what it saw, what it asked, what it
  * bought and sold, with the ETH that moved and the transaction behind it.
  */
-export function Timeline({ snap }: { snap: Snapshot }) {
+export function Timeline({ snap, onOpen }: { snap: Snapshot; onOpen?: (pick: { token: string; symbol: string }) => void }) {
   const reduce = useReducedMotion();
   return (
     <section className={s.block} aria-labelledby="tl-h">
@@ -52,7 +52,7 @@ export function Timeline({ snap }: { snap: Snapshot }) {
                       <p className={s.eventMeta}>
                         {e.wei ? <span className={`num ${BigInt(e.wei) >= 0n ? "up" : "down"}`}>{ethOf(e.wei)}</span> : null}
                         {e.hash && txUrl(e.hash) ? <a className="num" href={txUrl(e.hash)} target="_blank" rel="noopener">tx</a> : null}
-                        {e.token ? <a className="num" href={addressUrl(e.token)} target="_blank" rel="noopener">{e.symbol ?? "token"}</a> : null}
+                        {e.token ? onOpen ? <button type="button" className={s.linkish} onClick={() => onOpen({ token: e.token!, symbol: e.symbol ?? `${e.token!.slice(0, 6)}…${e.token!.slice(-4)}` })}>{e.symbol ?? "Token"} · Open chart →</button> : <a className="num" href={addressUrl(e.token)} target="_blank" rel="noopener">{e.symbol ?? "token"}</a> : null}
                       </p>
                     ) : null}
                   </div>
