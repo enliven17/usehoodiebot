@@ -17,6 +17,7 @@ test("market: later pages keep usable tokens and disclose partial source failure
   assert.equal(result.tokens[0]?.symbol, "MORE");
   assert.equal(result.incomplete, true);
   assert.equal(result.hasMore, true);
-  assert.equal(urls.length, 3);
-  assert.ok(urls.every((url) => new URL(url).searchParams.get("page") === "2"));
+  const gt = urls.filter((url) => url.includes("geckoterminal"));
+  assert.equal(gt.length, 4);
+  assert.ok(gt.every((url) => new URL(url).searchParams.get("page") === "2"));
 });

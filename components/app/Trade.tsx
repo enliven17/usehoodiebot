@@ -153,7 +153,7 @@ export function Trade({ snap, onChange, initialPick }: { snap: Snapshot; onChang
         <label htmlFor="find" className="sr-only">Find a token</label>
         <input id="find" className="field" placeholder="Symbol or address" value={find} onChange={(e) => setFind(e.target.value)} autoComplete="off" spellCheck={false} />
         <div className={s.marketFilters} role="group" aria-label="Token filter">
-          {[["all", "All"], ["held", "Held"], ["curve", "Curve"], ["graduated", "DEX"]].map(([key, label]) => <button key={key} type="button" aria-pressed={filter === key} onClick={() => setFilter(key!)}>{label}</button>)}
+          {[["all", "All"], ["held", "Held"], ["dex", "Established"], ["curve", "Curve"], ["graduated", "Graduated"]].map(([key, label]) => <button key={key} type="button" aria-pressed={filter === key} onClick={() => setFilter(key!)}>{label}</button>)}
         </div>
         <p className={s.marketStatus} role="status">{searching ? "Searching beyond this list…" : `${shown.length} tokens${query ? " found" : " loaded"}`}</p>
         {listError || (search?.q === query && search.error) ? <p className={s.marketStatus} role="alert">Market data is temporarily unavailable. <button type="button" className={s.linkish} onClick={() => { void loadList(); setSearch(null); setFind(""); }}>Retry</button></p> : null}
@@ -173,7 +173,7 @@ export function Trade({ snap, onChange, initialPick }: { snap: Snapshot; onChang
               <button type="button" className={s.tokenRow} aria-current={pick?.token === t.token ? "true" : undefined} onClick={() => setPick({ token: t.token, symbol: t.symbol, pool: t.pool })}>
                 <span className={s.tokenSym}>{t.symbol}</span>
                 <span className="num faint">{t.group === "held" ? "In wallet" : usd(t.mcapUsd)}</span>
-                <span className={s.tokenSub}>{t.venue === "graduated" ? "Uniswap" : t.curvePct !== undefined ? `Curve ${t.curvePct.toFixed(0)}%` : t.group === "traded" ? "Traded" : "Pons"}</span>
+                <span className={s.tokenSub}>{t.venue === "dex" ? "DEX" : t.venue === "graduated" ? "Uniswap" : t.curvePct !== undefined ? `Curve ${t.curvePct.toFixed(0)}%` : t.group === "traded" ? "Traded" : "Pons"}</span>
                 <span className={`num ${s.tokenSub}`}>{t.volume1hUsd !== undefined ? `${usd(t.volume1hUsd)} 1h` : ""}</span>
               </button>
             </li>
@@ -197,7 +197,7 @@ export function Trade({ snap, onChange, initialPick }: { snap: Snapshot; onChang
             <div><dt>Liquidity</dt><dd className="num">{usd(view?.market?.liquidityUsd)}</dd></div>
             <div><dt>Volume 1h</dt><dd className="num">{usd(view?.market?.volume1hUsd)}</dd></div>
             <div><dt>Buys / sells 1h</dt><dd className="num">{view?.market ? `${view.market.buys1h ?? 0} / ${view.market.sells1h ?? 0}` : "–"}</dd></div>
-            <div><dt>{view?.market?.venue === "graduated" ? "Venue" : "Curve"}</dt><dd className="num">{view?.market?.venue === "graduated" ? "Uniswap v4" : view?.market?.curvePct !== undefined ? `${view.market.curvePct.toFixed(0)}%` : "–"}</dd></div>
+            <div><dt>{view?.market?.venue === "curve" ? "Curve" : "Venue"}</dt><dd className="num">{view?.market?.venue === "graduated" ? "Uniswap v4" : view?.market?.venue === "dex" ? "Any DEX, via 0x" : view?.market?.curvePct !== undefined ? `${view.market.curvePct.toFixed(0)}%` : "–"}</dd></div>
           </dl>
         </header>
 

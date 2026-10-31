@@ -2,7 +2,7 @@
 import type { Candidate } from "./chain/market";
 
 export type Spec = {
-  watch: "new" | "curve" | "graduated" | "all";
+  watch: "new" | "curve" | "graduated" | "dex" | "all";
   sizeEth: number;
   slippageBps: number;
   maxOpen: number;
@@ -25,6 +25,8 @@ export type Spec = {
 
 export const SPEC_LIMITS = { sizeEth: [0.0005, 1], slippageBps: [50, 1500], maxOpen: [1, 10], exitPct: [5, 1000] } as const;
 const NEW_MINUTES = 120;
+/** An established token's pool has been trading at least this long: day-old pools with millions "in" them are bait. */
+const ESTABLISHED_MINUTES = 3 * 24 * 60;
 
 const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
 const pos = (v: unknown) => { const n = num(v); return n !== undefined && n >= 0 ? n : undefined; };
@@ -34,7 +36,7 @@ const exitPct = (v: unknown) => (pos(v) === undefined ? undefined : clamp(pos(v)
 /** Anything the model or a client sends becomes a safe Spec: unknown fields dropped, sizes clamped. */
 export function parseSpec(raw: unknown): Spec {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
-  const watch = ["new", "curve", "graduated", "all"].includes(r.watch as string) ? (r.watch as Spec["watch"]) : "new";
+  const watch = ["new", "curve", "graduated", "dex", "all"].includes(r.watch as string) ? (r.watch as Spec["watch"]) : "new";
   return {
     watch,
     sizeEth: clamp(num(r.sizeEth) ?? 0.01, SPEC_LIMITS.sizeEth),
@@ -59,6 +61,7 @@ export function parseSpec(raw: unknown): Spec {
 /** Null when the candidate passes, else the first rule it fails (shown to the user as the reason). */
 export function rejects(s: Spec, c: Candidate): string | null {
   if (s.watch === "graduated" && c.venue !== "graduated") return "not graduated";
+  if (s.watch === "dex" && (c.venue !== "dex" || !(c.ageMinutes !== undefined && c.ageMinutes >= ESTABLISHED_MINUTES))) return "not an established token";
   if ((s.watch === "curve" || s.watch === "new") && c.venue !== "curve") return "not on the curve";
   if (s.watch === "new" && !(c.ageMinutes !== undefined && c.ageMinutes <= NEW_MINUTES)) return "not a new launch";
   const below = (v: number | undefined, min: number | undefined) => min !== undefined && !(v !== undefined && v >= min);
@@ -125,7 +128,7 @@ export function ruleRows(s: Spec): RuleRow[] {
 /** One line per rule, for the model and for text. */
 export const describe = (s: Spec): string[] => ruleRows(s).map(([k, v]) => `${k}: ${v}`);
 
-export const WATCH_LABEL: Record<Spec["watch"], string> = { new: "New Pons launches", curve: "Tokens on the Pons curve", graduated: "Graduated Uniswap v4 pools", all: "All Pons tokens" };
+export const WATCH_LABEL: Record<Spec["watch"], string> = { new: "New Pons launches", curve: "Tokens on the Pons curve", graduated: "Graduated Uniswap v4 pools", dex: "Established tokens on any DEX", all: "Every token" };
 
 /** Take profit and stop loss in percent, both optional; a message when one is out of range. */
 export function exitsOf(b: { takeProfitPct?: unknown; stopLossPct?: unknown; trailingStopPct?: unknown }): { takeProfitPct?: number; stopLossPct?: number; trailingStopPct?: number } | string {

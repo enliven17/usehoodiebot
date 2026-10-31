@@ -69,3 +69,12 @@ test("sizeFor grows the entry from half at the safety bar to full at 100", () =>
   assert.equal(sizeFor(s, 100), 0.02);
   assert.equal(sizeFor(parseSpec({ watch: "new", sizeEth: 0.02 }), 40), 0.02);
 });
+
+test("established: only pools on any other DEX that have traded for days", () => {
+  const spec = parseSpec({ watch: "dex", sizeEth: 0.01 });
+  const c = (venue: Candidate["venue"], ageMinutes: number): Candidate => ({ token: "0x1111111111111111111111111111111111111111", symbol: "X", venue, priceEth: 1, ageMinutes });
+  assert.equal(rejects(spec, c("dex", 10 * 24 * 60)), null);
+  assert.equal(rejects(spec, c("dex", 60)), "not an established token");
+  assert.equal(rejects(spec, c("graduated", 10 * 24 * 60)), "not an established token");
+  assert.equal(rejects(parseSpec({ watch: "all" }), c("dex", 60)), null);
+});

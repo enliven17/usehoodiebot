@@ -8,7 +8,7 @@ export type TradeCard = {
   side: "buy" | "sell";
   token: string;
   symbol: string;
-  venue: "curve" | "graduated" | null;
+  venue: "curve" | "graduated" | "dex" | null;
   /** buy: ETH to spend; sell: share of the holding, in percent */
   ethAmount: number | null;
   pct: number | null;

@@ -8,6 +8,20 @@ export type Preset = { id: string; name: string; pitch: string; risk: "low" | "m
 
 export const PRESETS: readonly Preset[] = [
   {
+    id: "blue-chips",
+    name: "Blue Chips",
+    pitch: "Established tokens only: pools trading for days, deep liquidity, a high ShieldBot score. Small targets, a tight stop, no memecoin launches.",
+    risk: "low",
+    spec: { watch: "dex", sizeEth: 0.01, maxOpen: 3, minMcapUsd: 2_000_000, minLiquidityUsd: 250_000, minSafetyScore: 75, takeProfitPct: 12, stopLossPct: 6, trailingStopPct: 5 },
+  },
+  {
+    id: "trend-rider",
+    name: "Trend Rider",
+    pitch: "Established tokens with real volume this hour and more buyers than sellers. Rides the move, trails it, cuts quickly when it turns.",
+    risk: "medium",
+    spec: { watch: "dex", sizeEth: 0.01, maxOpen: 2, minLiquidityUsd: 100_000, minVolume1hUsd: 20_000, minBuySellRatio: 1.3, minSafetyScore: 70, takeProfitPct: 20, stopLossPct: 8, trailingStopPct: 7 },
+  },
+  {
     id: "launch-sniper",
     name: "Launch Sniper",
     pitch: "In the first ten minutes of a launch, only when buyers clearly outnumber sellers and ShieldBot is happy. Takes a double, trails the rest.",

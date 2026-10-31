@@ -1,16 +1,17 @@
 /**
  * Executor for a HOODIEBOT agent: trades from its Privy server wallet on Robinhood Chain.
- * Routing: the token's Pons bonding curve while it trades, the Uniswap v4 pool once it has graduated. Only Pons
- * tokens (ETH-quoted) are traded. Fills are read from the receipt (curve events, token Transfer logs), never from a
- * quote.
+ * Routing: the token's Pons bonding curve while it trades, the Uniswap v4 pool once it has graduated, and any other
+ * token through 0x (zerox.ts) across every DEX on the chain. Fills are read from the receipt (curve events, token
+ * Transfer logs), never from a quote.
  *
- * Units: ETH amounts are wei, token amounts raw units (18 decimals).
+ * Units: ETH amounts are wei, token amounts raw units (18 decimals on Pons; others read their own).
  *
  * Each transaction: nonce (pending), gas estimate +20%, EIP-1559 fees from the node, signed by Privy
  * (eth_signTransaction, under the wallet's policy), broadcast here, and awaited; a revert throws.
  */
 import {
   decodeEventLog,
+  erc20Abi,
   encodeFunctionData,
   maxUint160,
   maxUint256,
@@ -40,6 +41,7 @@ import {
   quoteCurveSell,
 } from "./pons";
 import { PERMIT2, PERMIT2_ABI, ponsPool, QUOTER_ABI, ROUTER_ABI, UNIVERSAL_ROUTER, V4_QUOTER, v4SwapCall, type PoolKey } from "./v4";
+import { ALLOWANCE_HOLDER, MAX_ROUND_TRIP_LOSS_BPS, roundTripBps, zeroxPrice, zeroxQuote, zeroxReady } from "./zerox";
 
 /** Kept in the wallet for gas: Robinhood Chain gas is cheap, a few hundred transactions' worth. */
 export const RESERVE_WEI = 300_000_000_000_000n; // 0.0003 ETH
@@ -51,7 +53,7 @@ export type Fill = { hash: string; wei: bigint; tokens: bigint };
 
 export type ExecutorDeps = { privy: Pick<Privy, "signEvmTransaction">; client?: PublicClient; reserveWei?: bigint };
 
-type Market = { kind: "curve"; curve: Address; reserves: { quote: bigint; tokens: bigint; feeBps: bigint; taxBps: bigint } } | { kind: "pool"; pool: PoolKey };
+type Market = { kind: "curve"; curve: Address; reserves: { quote: bigint; tokens: bigint; feeBps: bigint; taxBps: bigint } } | { kind: "pool"; pool: PoolKey } | { kind: "dex" };
 
 export function createExecutor(d: ExecutorDeps) {
   const client = d.client ?? publicClient();
@@ -86,10 +88,13 @@ export function createExecutor(d: ExecutorDeps) {
     return receipt;
   }
 
-  /** Where `token` trades right now. Throws for a non-Pons, non-ETH or mid-graduation token. */
+  /** Where `token` trades right now: Pons curve or pool, else 0x. Throws for a mid-graduation or non-ETH Pons token. */
   async function market(token: string): Promise<Market> {
     const l = await client.readContract({ address: PONS_FACTORY, abi: FACTORY_ABI, functionName: "getLaunchedToken", args: [addr(token)] });
-    if (!l.exists) throw new Error(`${token} is not a Pons token`);
+    if (!l.exists) {
+      if (zeroxReady()) return { kind: "dex" };
+      throw new Error(`${token} is not a Pons token`);
+    }
     if (l.pairToken !== NATIVE) throw new Error(`${token} is not priced in ETH`);
     if (l.phase === Phase.PoolCreated) return { kind: "pool", pool: ponsPool(addr(token), l.poolFee, l.tickSpacing) };
     if (l.phase !== Phase.NotGraduated) throw new Error(`${token} is graduating; its pool is not open yet`);
@@ -153,7 +158,21 @@ export function createExecutor(d: ExecutorDeps) {
 
   const deadline = () => BigInt(Math.floor(Date.now() / 1000) + 300);
 
-  // Whether a token is a Pons V2 launch priced in ETH never changes: answer once per token per process.
+  /** Throws unless a buy of `wei` in a token outside Pons could be sold straight back for most of it (zerox.ts). */
+  async function exitable(token: string, wei: bigint) {
+    const back = await roundTripBps(token, wei);
+    if (back < 10_000n - MAX_ROUND_TRIP_LOSS_BPS) throw new Error(`Selling it straight back would return ${Number(back) / 100}% of the ETH: the liquidity is not really there. Not buying.`);
+  }
+
+  const decimalsCache = new Map<string, number>();
+  async function decimals(token: string): Promise<number> {
+    const key = token.toLowerCase();
+    if (!decimalsCache.has(key)) decimalsCache.set(key, Number(await client.readContract({ address: addr(token), abi: erc20Abi, functionName: "decimals" })));
+    return decimalsCache.get(key)!;
+  }
+
+  // Whether a token is a Pons V2 launch priced in ETH never changes; one 0x can route is taken as routable for the
+  // process. ponytail: a token 0x stops routing later fails at trade time, with its reason, instead.
   const tradableCache = new Map<string, boolean>();
   async function tradable(token: string): Promise<boolean> {
     const key = token.toLowerCase();
@@ -161,7 +180,7 @@ export function createExecutor(d: ExecutorDeps) {
     if (hit !== undefined) return hit;
     try {
       const l = await client.readContract({ address: PONS_FACTORY, abi: FACTORY_ABI, functionName: "getLaunchedToken", args: [addr(token)] });
-      const ok = l.exists && l.pairToken === NATIVE;
+      const ok = l.exists ? l.pairToken === NATIVE : zeroxReady() && (await roundTripBps(token, 10n ** 16n).then((bps) => bps >= 10_000n - MAX_ROUND_TRIP_LOSS_BPS, () => false));
       if (tradableCache.size > 20_000) tradableCache.clear();
       tradableCache.set(key, ok);
       return ok;
@@ -173,9 +192,14 @@ export function createExecutor(d: ExecutorDeps) {
   const executor = {
     market,
 
+    /** The rug check a buy outside Pons must pass, for paper buys to face what a live one does. No-op on Pons. */
+    async checkExit(token: string, wei: bigint) {
+      if ((await market(token)).kind === "dex") await exitable(token, wei);
+    },
+
     /**
-     * Only the tokens this executor can trade: GeckoTerminal's Pons lists also carry tokens from Pons V1 and other
-     * paths, which the V2 factory does not know.
+     * Only the tokens this executor can trade: Pons V2 launches priced in ETH, and any token 0x finds a route for
+     * (never a Robinhood Stock Token: 0x refuses them).
      */
     async onlyTradable<C extends { token: string }>(candidates: C[]): Promise<C[]> {
       const ok = await Promise.all(candidates.map((c) => tradable(c.token)));
@@ -187,6 +211,12 @@ export function createExecutor(d: ExecutorDeps) {
       const wei = a.wei;
       if (wei <= 0n) throw new Error("buy amount must be positive");
       const m = await market(token);
+      if (m.kind === "dex") {
+        await exitable(token, wei);
+        const q = await zeroxQuote(token, true, wei, a.wallet, a.slippageBps);
+        const receipt = await send(a.walletId, a.wallet, { to: q.to, value: q.value, data: q.data }, a.onSigned);
+        return { hash: receipt.transactionHash, wei, tokens: tokenDelta(receipt, token, a.wallet) };
+      }
       if (m.kind === "curve") {
         const least = minOut(quoteCurveBuy(wei, m.reserves), a.slippageBps);
         const data = encodeFunctionData({ abi: CURVE_ABI, functionName: "buy", args: [wei, least, addr(a.wallet)] });
@@ -212,11 +242,18 @@ export function createExecutor(d: ExecutorDeps) {
         const f = curveFill(receipt, m.curve, "CurveSell");
         return { hash: receipt.transactionHash, wei: f.eth, tokens: f.tokens };
       }
-      await permitRouter(a.walletId, a.wallet, token, a.tokens);
-      const least = minOut(await quotePool(m.pool, false, a.tokens), a.slippageBps);
+      let call: { to: Address; data: Hex };
+      if (m.kind === "dex") {
+        await approve(a.walletId, a.wallet, token, ALLOWANCE_HOLDER, a.tokens);
+        const q = await zeroxQuote(token, false, a.tokens, a.wallet, a.slippageBps);
+        call = { to: q.to, data: q.data };
+      } else {
+        await permitRouter(a.walletId, a.wallet, token, a.tokens);
+        const least = minOut(await quotePool(m.pool, false, a.tokens), a.slippageBps);
+        call = { to: UNIVERSAL_ROUTER, data: encodeFunctionData({ abi: ROUTER_ABI, functionName: "execute", args: v4SwapCall(m.pool, false, a.tokens, least, deadline()) }) };
+      }
       const before = await client.getBalance({ address: addr(a.wallet) });
-      const data = encodeFunctionData({ abi: ROUTER_ABI, functionName: "execute", args: v4SwapCall(m.pool, false, a.tokens, least, deadline()) });
-      const receipt = await send(a.walletId, a.wallet, { to: UNIVERSAL_ROUTER, data }, a.onSigned);
+      const receipt = await send(a.walletId, a.wallet, call, a.onSigned);
       // ETH arrives as a plain transfer: the balance change plus the gas this tx paid.
       const after = await client.getBalance({ address: addr(a.wallet), blockNumber: receipt.blockNumber });
       const received = after - before + receipt.gasUsed * receipt.effectiveGasPrice;
@@ -226,6 +263,7 @@ export function createExecutor(d: ExecutorDeps) {
     /** Quote without trading: tokens for `wei` on a buy, or wei for `tokens` on a sell, fees included. */
     async quote(token: string, side: "buy" | "sell", amount: bigint): Promise<bigint> {
       const m = await market(token);
+      if (m.kind === "dex") return zeroxPrice(token, side === "buy", amount);
       if (m.kind === "curve") return side === "buy" ? quoteCurveBuy(amount, m.reserves) : quoteCurveSell(amount, m.reserves);
       return quotePool(m.pool, side === "buy", amount);
     },
@@ -275,6 +313,13 @@ export function createExecutor(d: ExecutorDeps) {
         tokens.map(async (t) => {
           try {
             const m = await market(t);
+            if (m.kind === "dex") {
+              // the same unit as a Pons price: ETH per 10^18 raw units, whatever the token's decimals
+              const dec = await decimals(t);
+              const wei = await zeroxPrice(t, false, 10n ** BigInt(dec));
+              if (wei > 0n) out.set(t, (Number(wei) / 1e18) * 10 ** (18 - dec));
+              return;
+            }
             // ponytail: the sell quote for 1 whole token, fees included: a slight underestimate, never an overstatement.
             const wei = m.kind === "curve" ? quoteCurveSell(one, m.reserves) : await quotePool(m.pool, false, one);
             if (wei > 0n) out.set(t, Number(wei) / 1e18);

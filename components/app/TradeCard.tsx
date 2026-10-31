@@ -43,7 +43,7 @@ export function TradeCard({ card, onDone }: { card: Card; onDone: () => void }) 
         <span className={s.tcSide}>{buy ? "Buy" : "Sell"}</span>
         <strong className={s.tcSym}>${card.symbol}</strong>
         <a className="num faint" href={addressUrl(card.token)} target="_blank" rel="noopener">{short(card.token)}</a>
-        <span className="faint">{card.venue === "graduated" ? "Uniswap" : card.venue === "curve" ? "Pons curve" : ""}</span>
+        <span className="faint">{card.venue === "graduated" ? "Uniswap" : card.venue === "curve" ? "Pons curve" : card.venue === "dex" ? "DEX" : ""}</span>
       </div>
       <dl className={s.tcFacts}>
         <div><dt>Price</dt><dd className="num">{card.priceEth ? `${price(card.priceEth)} ETH` : "–"}</dd></div>

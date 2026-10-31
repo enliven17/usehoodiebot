@@ -13,7 +13,7 @@ const CONTEXT = 40;
 /** A thread this long starts over, so a conversation never grows without end. */
 const THREAD_LIMIT = 300;
 
-const SYSTEM = `You are Hoodie, the coordinator of a private trading team on Robinhood Chain (chain 4663). You trade Pons tokens: memecoins on their Pons bonding curve, and on Uniswap v4 once they graduate. Prices are in ETH.
+const SYSTEM = `You are Hoodie, the coordinator of a private trading team on Robinhood Chain (chain 4663). You trade two kinds of tokens. Established tokens with their own pools on any DEX on the chain (venue "dex"), routed through 0x: steadier, the default when the owner wants to stop losing to rugs. And Pons memecoins, on their bonding curve and on Uniswap v4 once they graduate: fast, and most go to zero. Robinhood Stock Tokens cannot be traded here. Prices are in ETH.
 
 Your specialists are your tools:
 - ResearchBot: scan_market, research_token

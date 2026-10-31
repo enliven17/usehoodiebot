@@ -1,7 +1,8 @@
 /**
  * The Privy policy on a HOODIEBOT agent wallet (chain_type "ethereum"). Pure: the JSON for POST /v1/policies.
  * Default DENY; it may only sign transactions on Robinhood Chain that
- *   - launch on the Pons factory, claim from the Pons fee escrow, or swap through the Uniswap UniversalRouter;
+ *   - launch on the Pons factory, claim from the Pons fee escrow, or swap through the Uniswap UniversalRouter or 0x's
+ *     AllowanceHolder (any other token, routed by 0x);
  *   - call a Pons curve's buy or sell paying out to the wallet itself, or sweepFees (each launch has its own curve,
  *     so curves are matched by function and recipient, not address);
  *   - approve a spender (a curve or Permit2 pulls the tokens on a sell) or let Permit2 hand the router an allowance;
@@ -18,6 +19,7 @@
 import { ROBINHOOD_CHAIN } from "./robinhood";
 import { PONS_FACTORY, PONS_FEE_ESCROW } from "./pons";
 import { PERMIT2, UNIVERSAL_ROUTER } from "./v4";
+import { ALLOWANCE_HOLDER } from "./zerox";
 
 /** The largest buy a strategy may size (lib/strategy.ts SPEC_LIMITS), and headroom over the live 0.0005 ETH launch fee. */
 export const MAX_TRADE_WEI = 10n ** 18n;
@@ -50,6 +52,7 @@ export function robinhoodAgentPolicy(wallet: string, owner: string, treasury: st
       rule("Pons factory launch", to(PONS_FACTORY), valueAtMost(MAX_LAUNCH_WEI)),
       rule("Fee escrow claim, Permit2", to(PONS_FEE_ESCROW, PERMIT2), noValue),
       rule("Uniswap v4 router swap", to(UNIVERSAL_ROUTER), valueAtMost(MAX_TRADE_WEI)),
+      rule("0x swap", to(ALLOWANCE_HOLDER), valueAtMost(MAX_TRADE_WEI)),
       rule("Curve buy to itself", call("buy.recipient", "eq", lower(wallet), CURVE_ABI), valueAtMost(MAX_TRADE_WEI)),
       rule("Curve sell to itself", call("sell.recipient", "eq", lower(wallet), CURVE_ABI), noValue),
       rule("Sweep its curve's fees", call("function_name", "eq", "sweepFees", CURVE_ABI), noValue),

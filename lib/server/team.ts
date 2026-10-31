@@ -102,6 +102,7 @@ async function paperTrade(team: Team, a: Parameters<typeof trade>[1]) {
   const hash = `paper:${randomUUID()}`;
   if (a.kind === "buy") {
     if (team.paperWei < a.amount) throw new Error(`The paper balance has ${formatEther(team.paperWei)} ETH; this needs ${formatEther(a.amount)}. Reset it in the wallet panel.`);
+    await ex.checkExit(a.token, afterFee(a.amount));
     const tokens = await ex.quote(a.token, "buy", afterFee(a.amount));
     if (tokens <= 0n) throw new Error(`No quote for ${a.symbol} right now.`);
     await mutate(api.book.bought, { paper: true, owner: team.owner, strategyId: strategyId(a.strategyId), token: a.token, symbol: a.symbol, tokens: tokens.toString(), wei: a.amount.toString(), hash, takeProfitPct: a.takeProfitPct, stopLossPct: a.stopLossPct, trailingStopPct: a.trailingStopPct });

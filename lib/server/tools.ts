@@ -32,7 +32,7 @@ const brief = (c: Candidate) => ({
 });
 
 const SPEC_SCHEMA = obj({
-  watch: { type: "string", enum: ["new", "curve", "graduated", "all"], description: "new = Pons launches under 2h old on their curve" },
+  watch: { type: "string", enum: ["dex", "new", "curve", "graduated", "all"], description: "dex = established tokens with their own pools on any DEX (the steadier choice); new = Pons launches under 2h old on their curve; curve and graduated = Pons memecoins; all = everything" },
   sizeEth: { type: "number", description: `ETH per entry, ${SPEC_LIMITS.sizeEth[0]}–${SPEC_LIMITS.sizeEth[1]}` },
   slippageBps: { type: "number", description: "max slippage in basis points, default 300" },
   maxOpen: { type: "number", description: "max open positions from this strategy, default 3" },
@@ -53,8 +53,8 @@ const safetyOf = async (token: string) => {
 export const TOOLS: Tool[] = [
   {
     name: "scan_market", member: "research",
-    description: "List Pons tokens on Robinhood Chain right now from GeckoTerminal: fresh launches and the busiest curve and graduated tokens, with market cap, liquidity, curve progress, age and last-hour buys/sells.",
-    input_schema: obj({ venue: { type: "string", enum: ["curve", "graduated", "any"] }, limit: { type: "number", description: "default 12, max 30" } }),
+    description: "List tokens on Robinhood Chain right now from GeckoTerminal: established tokens on any DEX (venue dex), fresh Pons launches and the busiest Pons curve and graduated memecoins, with market cap, liquidity, curve progress, age and last-hour buys/sells.",
+    input_schema: obj({ venue: { type: "string", enum: ["dex", "curve", "graduated", "any"] }, limit: { type: "number", description: "default 12, max 30" } }),
     async run(_t, i) {
       const list = (await candidates()).filter((c) => !i.venue || i.venue === "any" || c.venue === i.venue);
       return list.slice(0, Math.min(30, Number(i.limit) || 12)).map(brief);
@@ -62,20 +62,20 @@ export const TOOLS: Tool[] = [
   },
   {
     name: "research_token", member: "research",
-    description: "Read one Pons token: where it trades (bonding curve or Uniswap v4), its market data if listed, and what a 0.01 ETH buy would get right now including fees.",
+    description: "Read one token: where it trades (Pons bonding curve, Uniswap v4 after graduating, or any DEX through 0x), its market data if listed, and what a 0.01 ETH buy would get right now including fees.",
     input_schema: obj({ token: { type: "string", description: "0x token address" } }, ["token"]),
     async run(_t, i) {
       const token = normalizeToken(i.token);
       if (!token) return { error: "Not a token address." };
       const ex = getExecutor();
-      if (!(await ex.onlyTradable([{ token }])).length) return { error: "Not a Pons V2 token priced in ETH; Hoodie does not trade it." };
+      if (!(await ex.onlyTradable([{ token }])).length) return { error: "Hoodie cannot trade it: no route from ETH right now, or it is a Robinhood Stock Token." };
       const [m, listed, quote] = await Promise.all([ex.market(token), candidates().then((l) => l.find((c) => c.token === token)), ex.quote(token, "buy", parseEther("0.01")).catch(() => null)]);
-      return { token, explorer: addressUrl(token), tradesOn: m.kind === "curve" ? "Pons bonding curve" : "Uniswap v4 (graduated)", market: listed ? brief(listed) : null, tokensFor001Eth: quote === null ? null : formatEther(quote) };
+      return { token, explorer: addressUrl(token), tradesOn: m.kind === "curve" ? "Pons bonding curve" : m.kind === "pool" ? "Uniswap v4 (graduated)" : "any DEX, routed by 0x", market: listed ? brief(listed) : null, tokensFor001Eth: quote === null ? null : formatEther(quote) };
     },
   },
   {
     name: "find_token", member: "research",
-    description: "Find Pons tokens by symbol, name or address when the owner names one (\"buy some PEPE\"). Returns up to 5 tradable matches, busiest first, with address, market cap, liquidity and age, so you can say which one you mean.",
+    description: "Find tokens (Pons or any other DEX) by symbol, name or address when the owner names one (\"buy some PEPE\"). Returns up to 5 tradable matches, busiest first, with address, market cap, liquidity and age, so you can say which one you mean.",
     input_schema: obj({ query: { type: "string", description: "symbol, name, or 0x address" } }, ["query"]),
     async run(_t, i) {
       const q = String(i.query ?? "").trim().replace(/^\$/, "");
@@ -95,7 +95,7 @@ export const TOOLS: Tool[] = [
     async run(team, i) {
       const token = normalizeToken(i.token);
       const ex = getExecutor();
-      if (!token || !(await ex.onlyTradable([{ token }])).length) return { error: "Not a tradable Pons token priced in ETH." };
+      if (!token || !(await ex.onlyTradable([{ token }])).length) return { error: "Hoodie cannot trade that token: no route from ETH right now, or it is a Robinhood Stock Token." };
       const side = i.side === "sell" ? "sell" : "buy";
       const eth = Number(i.ethAmount);
       if (side === "buy" && !(eth >= SPEC_LIMITS.sizeEth[0] && eth <= SPEC_LIMITS.sizeEth[1])) return { error: `Buy size must be ${SPEC_LIMITS.sizeEth[0]}–${SPEC_LIMITS.sizeEth[1]} ETH. Ask how much.` };
@@ -138,7 +138,7 @@ export const TOOLS: Tool[] = [
     description: "Replay a strategy's exits (take profit, stop loss, trailing stop) on recent Pons tokens of the kind it watches, fees included: win rate, average and median return, best and worst, profit factor, P&L and drawdown at its size. Give a preset id or a spec. Say plainly it tests exits on tokens still listed, not the entry filters.",
     input_schema: obj({ preset: { type: "string", enum: PRESETS.map((p) => p.id) }, spec: { ...SPEC_SCHEMA, required: [] } }),
     async run(_t, i) {
-      const spec = parseSpec({ ...(presetById(i.preset)?.spec ?? { watch: "new", sizeEth: 0.01 }), ...((i.spec as object) ?? {}) });
+      const spec = parseSpec({ ...(presetById(i.preset)?.spec ?? { watch: "dex", sizeEth: 0.01 }), ...((i.spec as object) ?? {}) });
       const r = await backtest(spec);
       return { rules: describe(spec), ...r, tokens: r.tokens.map((x) => ({ symbol: x.symbol, returnPct: Number(x.returnPct.toFixed(1)), exit: x.reason, heldCandles: x.heldBars })) };
     },
@@ -208,7 +208,7 @@ export const TOOLS: Tool[] = [
     input_schema: obj({ kind: { type: "string", enum: ["buy", "sell"] }, token: { type: "string" }, symbol: { type: "string" }, ethAmount: { type: "number" }, reason: { type: "string", description: "one sentence the owner reads on the approval card" } }, ["kind", "token", "symbol", "reason"]),
     async run(team, i) {
       const token = normalizeToken(i.token);
-      if (!token || !(await getExecutor().onlyTradable([{ token }])).length) return { error: "Not a tradable Pons token." };
+      if (!token || !(await getExecutor().onlyTradable([{ token }])).length) return { error: "Hoodie cannot trade that token." };
       const eth = Number(i.ethAmount);
       if (i.kind === "buy" && !(eth >= SPEC_LIMITS.sizeEth[0] && eth <= SPEC_LIMITS.sizeEth[1])) return { error: `Buy size must be ${SPEC_LIMITS.sizeEth[0]}–${SPEC_LIMITS.sizeEth[1]} ETH.` };
       // ShieldBot has the last word on buys: a blocked token is never put in front of the owner
@@ -225,7 +225,7 @@ export const TOOLS: Tool[] = [
     description: "Save a Strategy SniperBot checks every minute. Every match is put up for the owner's approval. Only the owner can make a strategy trade automatically: in the Team tab, with Autopilot on and a budget.",
     input_schema: obj({ name: { type: "string" }, preset: { type: "string", enum: PRESETS.map((p) => p.id), description: `start from a ready-made strategy: ${PRESETS.map((p) => `${p.id} (${p.name}: ${p.pitch})`).join("; ")}. Fields in spec override it.` }, spec: { ...SPEC_SCHEMA, required: [] } }, ["name"]),
     async run(team, i) {
-      const spec = parseSpec({ ...(presetById(i.preset)?.spec ?? { watch: "new", sizeEth: 0.01 }), ...((i.spec as object) ?? {}) });
+      const spec = parseSpec({ ...(presetById(i.preset)?.spec ?? { watch: "dex", sizeEth: 0.01 }), ...((i.spec as object) ?? {}) });
       // Always "ask": tool input can be steered by token names in market data, so the model never turns on automatic trading.
       const id = await mutate(api.strategies.create, { owner: team.owner, name: String(i.name).slice(0, 60), spec, mode: "ask", limit: 5 });
       if (!id) return { error: "Five strategies are already running. Pause one first." };
@@ -295,7 +295,7 @@ function timeline(name: string, args: Record<string, unknown>, out: unknown): Te
   const token = typeof args.token === "string" ? args.token : undefined;
   switch (name) {
     case "scan_market":
-      return Array.isArray(out) ? { member: "research", kind: "scan", text: `Scanned ${out.length} Pons tokens.` } : null;
+      return Array.isArray(out) ? { member: "research", kind: "scan", text: `Scanned ${out.length} tokens.` } : null;
     case "research_token": {
       const m = o.market as { symbol?: string; curvePct?: number | null; liquidityUsd?: number | null } | null;
       const what = m ? `${m.symbol}: ${m.curvePct ?? "?"}% up its curve, $${(m.liquidityUsd ?? 0).toLocaleString("en-US")} liquidity` : "a token that is not listed yet";

@@ -10,6 +10,7 @@
  */
 import { getAddress, isAddress } from "viem";
 import { GeckoClient } from "./gecko";
+import { stockTokens } from "./stocks";
 
 const GT = "https://api.geckoterminal.com/api/v2/networks/robinhood";
 /** Phantom quote (1.68 ETH) plus the 4.2 ETH threshold: a curve's quote reserve when it graduates. */
@@ -17,7 +18,8 @@ const CURVE_FULL_ETH = 5.88;
 const PHANTOM_ETH = 1.68;
 const TTL_MS = 60_000;
 
-export type Venue = "curve" | "graduated";
+/** curve and graduated are Pons; dex is any other token with a pool of its own, traded through 0x. */
+export type Venue = "curve" | "graduated" | "dex";
 export type Candidate = {
   token: `0x${string}`;
   symbol: string;
@@ -95,26 +97,39 @@ const gecko = new GeckoClient();
 export const gt = <T>(url: string, ttl = TTL_MS, maxAge?: number): Promise<T> => gecko.get<T>(url, ttl, maxAge);
 const pools = (url: string) => gt<{ data?: Pool[] }>(url).then((j) => j.data ?? []);
 
-/** Fresh launches and the busiest curve tokens, then the busiest graduated ones. Deduplicated by token. */
+/** Not worth a strategy's entry: wrapped ETH and the dollar, which is what the other side of most pools is. */
+const NOT_A_TRADE = new Set(["0x0bd7d308f8e1639fab988df18a8011f41eacad73", "0x5fc5360d0400a0fd4f2af552add042d716f1d168"]);
+/** Names a copycat borrows to pass for the real thing: only the real addresses above may carry them. */
+const BORROWED = new Set(["WETH", "ETH", "USDG", "USDC", "USDT", "WBTC", "BTC"]);
+const venueOf = (dex: string | undefined): Venue => (dex === "pons-v2" ? "curve" : dex === "pons-v2-dex" ? "graduated" : "dex");
+
+/**
+ * Fresh launches and the busiest curve tokens, the busiest graduated ones, then the busiest pools on any other DEX:
+ * established tokens, never a Stock Token (0x refuses them). Deduplicated by token.
+ */
 export async function candidatePage(page = 1): Promise<{ tokens: Candidate[]; incomplete: boolean; hasMore: boolean }> {
   const now = Date.now();
   const results = await Promise.allSettled([
     pools(`${GT}/new_pools?page=${page}`),
     pools(`${GT}/dexes/pons-v2/pools?page=${page}&sort=h24_volume_usd_desc`),
     pools(`${GT}/dexes/pons-v2-dex/pools?page=${page}&sort=h24_volume_usd_desc`),
+    pools(`${GT}/pools?page=${page}&sort=h24_volume_usd_desc`),
   ]);
   if (results.every((r) => r.status === "rejected")) throw new Error("Market data is temporarily unavailable");
-  const [newest = [], curve = [], graduated = []] = results.map((r) => r.status === "fulfilled" ? r.value : []);
+  const [newest = [], curve = [], graduated = [], busiest = []] = results.map((r) => r.status === "fulfilled" ? r.value : []);
   const fresh = newest.filter((p) => p.relationships?.dex?.data?.id === "pons-v2");
+  const stocks = await stockTokens();
+  const dex = busiest.filter((p) => venueOf(p.relationships?.dex?.data?.id) === "dex");
   const all = [
     ...[...fresh, ...curve].map((p) => toCandidate(p, "curve", now)),
     ...graduated.map((p) => toCandidate(p, "graduated", now)),
-  ].filter((c): c is Candidate => c !== null);
+    ...dex.map((p) => toCandidate(p, "dex", now)),
+  ].filter((c): c is Candidate => c !== null && !stocks.has(c.token.toLowerCase()) && !NOT_A_TRADE.has(c.token.toLowerCase()) && !(c.venue === "dex" && BORROWED.has(c.symbol.toUpperCase())));
   const seen = new Set<string>();
   return {
     tokens: all.filter((c) => !seen.has(c.token) && seen.add(c.token)),
     incomplete: results.some((r) => r.status === "rejected"),
-    hasMore: page < 10 && [newest, curve, graduated].some((list) => list.length > 0),
+    hasMore: page < 10 && [newest, curve, graduated, busiest].some((list) => list.length > 0),
   };
 }
 
@@ -134,7 +149,7 @@ export async function tokenMarket(token: string): Promise<(Candidate & { pool: s
   const p = list.find((x) => x.relationships?.dex?.data?.id?.startsWith("pons-v2")) ?? list[0];
   const pool = p?.attributes?.address;
   if (!p || !pool) return null;
-  const c = toCandidate(p, p.relationships?.dex?.data?.id === "pons-v2" ? "curve" : "graduated", Date.now());
+  const c = toCandidate(p, venueOf(p.relationships?.dex?.data?.id), Date.now());
   return c && { ...c, pool };
 }
 
@@ -149,12 +164,11 @@ export async function candles(pool: string, tf: Timeframe): Promise<Candle[]> {
     .filter((c, i, all) => i === 0 || c.time !== all[i - 1]!.time);
 }
 
-/** Pons tokens priced in ETH whose name or symbol matches `q`, busiest pool first, one row per token. */
+/** Tokens whose name or symbol matches `q`, Pons or any other DEX, busiest pool first, one row per token, no Stock Tokens. */
 export async function searchTokens(q: string): Promise<Candidate[]> {
-  const list = await pools(`${GT}/search/pools?query=${encodeURIComponent(q.slice(0, 40))}&network=robinhood`);
+  const [list, stocks] = await Promise.all([pools(`${GT}/search/pools?query=${encodeURIComponent(q.slice(0, 40))}&network=robinhood`), stockTokens()]);
   const seen = new Set<string>();
   return list
-    .filter((p) => p.relationships?.dex?.data?.id?.startsWith("pons-v2") || p.relationships?.dex?.data?.id === "uniswap-v4-robinhood")
-    .map((p) => toCandidate(p, p.relationships?.dex?.data?.id === "pons-v2" ? "curve" : "graduated", Date.now()))
-    .filter((c): c is Candidate => c !== null && (c.quote === "WETH" || c.quote === "ETH") && !seen.has(c.token) && !!seen.add(c.token));
+    .map((p) => toCandidate(p, venueOf(p.relationships?.dex?.data?.id), Date.now()))
+    .filter((c): c is Candidate => c !== null && (c.venue !== "graduated" || c.quote === "WETH" || c.quote === "ETH") && !stocks.has(c.token.toLowerCase()) && !seen.has(c.token) && !!seen.add(c.token));
 }

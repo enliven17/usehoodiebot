@@ -7,7 +7,7 @@ import type { Preset } from "@/lib/presets";
 import { api, type BacktestRun } from "./api";
 import s from "./app.module.css";
 
-const WATCH = [["new", "New launches"], ["curve", "On the curve"], ["graduated", "Graduated"], ["all", "All Pons"]] as const;
+const WATCH = [["dex", "Established"], ["new", "New launches"], ["curve", "On the curve"], ["graduated", "Graduated"], ["all", "Everything"]] as const;
 
 /** Each field: what the owner types, the spec key it fills, and the unit shown beside it. */
 const FIELDS: Array<{ key: string; label: string; unit: string; placeholder: string; group: "entry" | "filter" | "exit" }> = [
@@ -36,7 +36,7 @@ const fromPreset = (p: Preset): Record<string, string> =>
 
 export function Builder({ autopilot, preset, onSaved }: { autopilot: boolean; preset?: Preset | null; onSaved: () => void }) {
   const [name, setName] = useState(preset?.name ?? "");
-  const [watch, setWatch] = useState<(typeof WATCH)[number][0]>(preset?.spec.watch ?? "new");
+  const [watch, setWatch] = useState<(typeof WATCH)[number][0]>(preset?.spec.watch ?? "dex");
   const [v, setV] = useState<Record<string, string>>(preset ? fromPreset(preset) : DEFAULTS);
   const [mode, setMode] = useState<"ask" | "auto">(autopilot ? "auto" : "ask");
   const [busy, setBusy] = useState(false);

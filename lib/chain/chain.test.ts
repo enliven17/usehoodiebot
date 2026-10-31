@@ -45,6 +45,7 @@ test("policy: every rule pinned to chain 4663, and only the owner payout carries
   const cap = (name: string) => p.rules.find((r) => r.name === name)!.conditions.find((c) => c.field === "value")!.value;
   assert.equal(cap("Curve sell to itself"), "0x0");
   assert.equal(BigInt(cap("Curve buy to itself") as string), MAX_TRADE_WEI);
+  assert.equal(BigInt(cap("0x swap") as string), MAX_TRADE_WEI);
 });
 
 test("policy: the commission goes only to the fee wallet, capped per transfer", () => {
