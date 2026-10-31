@@ -102,6 +102,21 @@ function Autopilot({ snap, onChange }: { snap: Snapshot; onChange: () => void })
   const autos = snap.strategies.filter((x) => x.active && x.mode === "auto").length;
   const used = a.budgetEth ? Math.min(100, (a.deployedEth / a.budgetEth) * 100) : 0;
 
+  // Autopilot only runs strategies: with none set to trade automatically, it has nothing to do
+  async function start(p: Preset) {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.createStrategy({ name: p.name, spec: p.spec, mode: "auto" });
+      if (!a.on) await api.autopilot(true, Number(budget) || 0.1);
+      onChange();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function set(on: boolean) {
     setBusy(true);
     setError(null);
@@ -128,6 +143,16 @@ function Autopilot({ snap, onChange }: { snap: Snapshot; onChange: () => void })
           : "Off: every strategy asks before it buys. Turn it on to let strategies set to trade automatically act on their own, inside a budget you set."}
         {autos ? ` ${autos} automatic ${autos === 1 ? "strategy" : "strategies"} running.` : " No strategy is set to trade automatically yet."}
       </p>
+      {a.on && !autos ? (
+        <div className={s.apConfirm}>
+          <p>Autopilot has nothing to run yet. Pick a strategy and the team starts watching the market for it right away:</p>
+          <div className={s.apRow}>
+            {PRESETS.map((p) => (
+              <button key={p.id} type="button" className="btn" disabled={busy} onClick={() => start(p)}>{p.name}</button>
+            ))}
+          </div>
+        </div>
+      ) : null}
       {a.on ? (
         <div className={s.apMeter}>
           <span style={{ width: `${used}%` }} />

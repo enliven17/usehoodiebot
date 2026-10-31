@@ -38,7 +38,7 @@ export function Builder({ autopilot, preset, onSaved }: { autopilot: boolean; pr
   const [name, setName] = useState(preset?.name ?? "");
   const [watch, setWatch] = useState<(typeof WATCH)[number][0]>(preset?.spec.watch ?? "new");
   const [v, setV] = useState<Record<string, string>>(preset ? fromPreset(preset) : DEFAULTS);
-  const [mode, setMode] = useState<"ask" | "auto">("ask");
+  const [mode, setMode] = useState<"ask" | "auto">(autopilot ? "auto" : "ask");
   const [busy, setBusy] = useState(false);
   const [test, setTest] = useState<BacktestRun | "running" | null>(null);
   const [error, setError] = useState<string | null>(null);
